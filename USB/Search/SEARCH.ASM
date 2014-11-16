@@ -127,14 +127,88 @@ getUSBInfo:
 	shr eax, 8             ; (Getting Prog IF)
 	and ax, 00FFh          ; 
 	push ax                ;
-	mov si, ax             ;
+	mov si, ax             ; Saved Prog IF in SI
 	call printByteFromStack; (Prog IF)
+	mov ax, si             ; Parameter for Definition in ax
+	call displayUSBtype    ; 
 	mov ah, 09h            ; 
 	lea dx, newLine        ; 
-    	int 21h                ;
+    int 21h                ;
+	call displayBARs       ; Display PCI BARS
 	pop dx                 ; Recover
 	pop si                 ;
 	ret                    ; Out from getPCIinfo call
+
+displayUSBtype:            ; ax - parameter
+	cmp ax, 0h             ;
+	jz  showusb00          ; UHCI
+	cmp ax, 10h            ;
+	jz  showusb10          ; OHCI
+	cmp ax, 20h            ;
+	jz  showusb20          ; EHCI
+	cmp ax, 30h            ;
+	jz  showusb30          ; xHCI
+
+   showusb00:
+	lea dx, usb_00         ;
+	jmp outUSBtype         ;
+
+   showusb10:
+	lea dx, usb_10         ;
+	jmp outUSBtype         ;
+
+   showusb20:
+	lea dx, usb_20         ;
+	jmp outUSBtype         ;
+
+   showusb30:
+	lea dx, usb_20         ;
+	
+outUSBtype:                ; Point to jump out of type definition
+	mov ah, 09h            ; Print string
+	int 21h                ;
+	ret                    ;
+
+displayBARS:
+	push ecx               ; 
+	push dx                ;
+	push si                ;
+	push di                ;
+	sub cx, CLASS_SUBCLASS ; cuz ECX firstly for CLASS retriving 
+	add cx, BAR0           ; first BAR offset
+	mov esi, ecx           ; Address
+
+	mov ah, 09h            ; Print title
+	lea dx, bars           ;
+	int 21h                ;
+	lea dx, newLine        ; CLRF
+	int 21h                ;
+	; Beauty part
+	mov cx, 6              ; Amount of bars
+   
+   cycbar:
+	mov eax, esi           ; USB Device PCI Address (ecx) 
+	add si, 04h            ; Next Bar
+	mov dx, CONFIG_ADDR    ; sets out PORT address
+	out dx, eax            ; sends request
+	mov dx, CONFIG_DATA    ; sets input PORT address
+	in  eax, dx            ; gets data from PCI device
+	mov di,  ax            ; save lower 16 bits
+	shr eax, 16            ; set alone high 16 bits
+	push ax                ; 
+	call printWordFromStack; Printing 1-st part
+	push di                ; 
+ 	call printWordFromStack; Printing 2-nd part
+	mov ah, 09h            ; Printing new line
+	lea dx, newLine        ;
+	int 21h                ; 
+	loop cycbar            ; loop it
+	
+	pop di                 ; Recover
+	pop si                 ;
+	pop dx                 ;
+	pop ecx                ;
+	ret                    ;
 	
 nextDevice:
 	and ecx, 0FFFFF800h    ; Clear all before device part
@@ -151,13 +225,13 @@ nextFunction:
 
 ; STRING CONST 
 hex_table db '0123456789ABCDEF'
-usb_00    db 'UHCI (Universal Host Controller Interface)$'
-usb_10    db 'OHCI (Open Host Controller Interface)$'
-usb_20    db 'EHCI (Enhanced Host Controller Interface)$'
-usb_30    db 'xHCI (Extensible Host Controller Interface)$'
-descrip   db 'Class SubClass | Program IF = $'
+usb_00    db ' UHCI (Universal Host Controller)$'
+usb_10    db ' OHCI (Open Host Controller)$'
+usb_20    db ' EHCI (Enhanced Host Controller)$'
+usb_30    db ' xHCI (Extensible Host Controller)$'
+descrip   db ' Class-SubClass-ProgIF = $'
 newLine   db 13, 10, '$'
-
+bars      db 'BARs (0-5):$'
 outOfProgram:
 	ret
 	end _
