@@ -183,8 +183,10 @@ displayBARS:
 	int 21h                ;
 	lea dx, newLine        ; CLRF
 	int 21h                ;
+	lea dx, space          ; Correct Output
+	int 21h                ; 
 	; Beauty part
-	mov cx, 6              ; Amount of bars
+	mov cx, 1              ; Amount of bars SET this variable!
    
    cycbar:
 	mov eax, esi           ; USB Device PCI Address (ecx) 
@@ -231,7 +233,8 @@ usb_20    db ' EHCI (Enhanced Host Controller)$'
 usb_30    db ' xHCI (Extensible Host Controller)$'
 descrip   db ' Class-SubClass-ProgIF = $'
 newLine   db 13, 10, '$'
-bars      db 'BARs (0-5):$'
+bars      db ' BARs (0-5):$'
+space     db '   $'
 outOfProgram:
 	ret
 	end _
