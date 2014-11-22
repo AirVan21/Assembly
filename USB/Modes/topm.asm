@@ -4,7 +4,6 @@
 	org 100h   ;  Going to create .COM file
 
 _:
-
 ; CONSTS
 CMOS_PORT   = 70h     ; port for CMOS memory access	
 STATUS_PORT = 64h     ; port for SHUTDOWN
@@ -19,12 +18,12 @@ start:
 
 set_prot_mode:
 	
-	call disable_interrapts ; Disable Maskable && Non-Maskable interrupts
-	mov  [real_ss],ss       ; запоминаем указатель стека
-    mov  [real_es],es       ; для реального режима
-	lgdt [GDTR]             ; Load GDT
+	call disable_interrapts  ; Disable Maskable && Non-Maskable interrupts
+	;mov  [real_ss],ss       ; Save Stack Pointer
+    ;mov  [real_es],es       ; 
+	;lgdt [GDTR]             ; Load GDT
 	; Exit()
-	jmp outOfProg         ;
+	jmp outOfProg            ;
 	
 	
 set_real_mode:
@@ -69,7 +68,9 @@ enable_interrupts:
 	out al, CMOS_PORT ;
 	ret               ;
 
-; The main global descriptors table, 8192 records 
+GDT_DESCR:
+
+; The main Global Descriptors Table (GDT), 8192 records 
 GDT_COUNT = 8192
 
 GDT:
@@ -78,13 +79,13 @@ CODE_descr		db 0FFh,0FFh,00h,00H,00H,10011010b, 11001111b,00h			; 1 code main co
 DATA_descr		db 0FFh, 0FFh, 00h, 00h, 00h, 10010010b, 11001111b	, 00h	; 2 data main descriptor
 GDT_16bitCS     db 0FFh, 0FFh, 0, 0, 0, 10011010b, 0, 0						; 3 16-bit code descriptor
 GDT_16bitDS     db 0FFh, 0FFh, 0, 0, 0, 10010010b, 0, 0						; 4 16-bit data descriptor
-gdt_free_cells:	
-times(GDT_COUNT-1-5)	db 0,0,0,0,0,0,0,0									; 5-8191 records	
+gdt_free_cells  db (GDT_COUNT-1-5) DUP (6 DUP(0))                           ; Setting zeros for
+;times(GDT_COUNT-1-5)	db 0,0,0,0,0,0,0,0									; 5-8191 records	
 
-GDT_size = _ - GDT
+GDT_size = GDT_DESCR - GDT
 GDTR			dw GDT_size-1
 				dd GDT
-				
+
 outOfProg:
 	
 	ret
