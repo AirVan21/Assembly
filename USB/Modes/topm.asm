@@ -7,8 +7,6 @@ _:
 
 ; CONSTS
 CMOS_PORT_ID   = 70h    ; Port for CMOS memory access	
-STATUS_PORT = 64h       ; Port for SHUTDOWN
-SHUT_DOWN   = 0FEh      ; CP SHUTDOWN commmand
 
 	jmp start  ;  Marker to place, where program starts	
 	
@@ -17,7 +15,8 @@ start:
 set_prot_mode:
 	
 	call enable_interrupts   ; Disable Maskable && Non-Maskable interrupts
-	lgdt [GDTR]              ;  
+	call setGDTpar           ; Calculate GDT size
+	lgdt GDTR                ;  
 	jmp outOfProg            ;
 	
 setGDTpar:
@@ -27,7 +26,7 @@ setGDTpar:
 	shl eax, 4               ; Segment*16
 	lea bx, GDT              ; Offset
 	add ax, bx               ; Linear Address calc
-	mov [GDTR+2], ax        ; Setting Address  
+	mov (GDTR+2), eax        ; Setting Address  
 	pop bx                   ; Recover bx
 	ret                      ;
 	
