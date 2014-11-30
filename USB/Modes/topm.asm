@@ -12,6 +12,8 @@ DATA_DESC_OFFS = 10h         ; Data Descriptor Offset
 STACK_BASE     = 1024*1024*5 ; 
 VIDEO_BASE     = 0B8000h     ; Video memory for color monitors
 
+ss_prev dw 0h                ; Right stack  buffer
+
 	jmp start  ;  Marker to place, where program starts	
 	
 start:
@@ -30,10 +32,10 @@ switchToPm:
 	mov ax, DATA_DESC_OFFS          ; Setting Data Selector
 	mov ds, ax                      ; 
 	mov es, ax                      ; Selector of Data Segment
-	mov ss, ax                      ; 
-	mov esp, STACK_BASE             ;
-	call remap_irq                  ; Remaps IRQ
+	;mov ss, ax                     ; Figure out problems with stack! 
+	;mov esp, STACK_BASE            ;
 	call printVideoMem              ; Prints test output in Video Memory
+	;call remap_irq                 ; Remaps IRQ
 	ret                             ;
 	
 setGDTpar:
@@ -43,36 +45,48 @@ setGDTpar:
 	shl eax, 4               		; Segment*16
 	lea bx, GDT              		; Offset
 	add ax, bx               		; Linear Address calc
-	mov dword ptr [(GDTR+2)], eax   ; Setting Address  
+	mov dword ptr [(GDTR+2)], eax           ; Setting Address  
 	pop bx                   		; Recover bx
 	ret                      		;
 
 ; Testing print
 printVideoMem:
-	mov edi, VIDEO_BASE             ; Setting VIDEO_BASE
-	mov [edi], 'P'                  ;
-	mov [edi + 1], 07h              ; Grey-On-Black
-	mov [edi + 2], 'M'              ;
-	mov [edi + 3], 07h              ; Grey-On-Black
+	
+	push bx                  ;
+	push edi                 ;
+	push ax                  ;
+	push cx                  ; Counter
+	
+	xor dx, dx               ; Clear 
+	xor cx, cx               ;
+
+	mov dl, 07h              ; Color
+	mov edi, VIDEO_BASE      ; Setting VIDEO_BASE
+	add edi, (80*20)         ; Displacement for print
+	
+   printChar:
+	xor ebx, ebx
+	lea ebx, pm_str
+        add bx, cx                ;
+	mov al, [5F8Eh:bx]        ; Char From string
+	cmp al, '$'               ;
+	jz outPrint               ;
+	shl cx, 1                 ;
+	mov bx, cx                ;
+	add ebx, edi              ;
+	mov [ebx], al             ;    
+	mov [ebx + 1], dl         ;
+	add cx, 1
+	jmp printChar             ;
+  
+   outPrint:
+		
+	pop bx
+	pop edi
+	pop ax
+	pop cx
+	
 	ret      
-
-
-;set_int_vectors:
-;	pusha                           ; Save all registers
-;	push exGP_handler               
-;	push 13
-;	push IDT
-;	call set_handler
-;	add esp, 3*4
-
-;	popa
-;	ret
-
-;exGP_handler:
-;	mov edi, VIDEO_BASE
-;	mov byte[edi],'G'
-;	mov byte[edi+2],'P'
-;	ret
 
 ; Remaps the external interrupts
 remap_irq:
@@ -151,6 +165,8 @@ GDT_DESCR:
 GDT_size = (GDT_DESCR - GDT)
 GDTR	dw (GDT_size-1) 
 		dd 0h
+
+pm_str db 'PM Mode$'
 
 outOfProg:
 	
