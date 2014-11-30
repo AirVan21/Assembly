@@ -1,14 +1,16 @@
 	model tiny
 	.CODE
 	.486p
-	org 100h          ;  Going to create .COM file
+	org 100h          		 ;  Going to create .COM file
 
 _:
 
 ; CONSTS
-CMOS_PORT_ID   = 70h    ; Port for CMOS memory access	
-CODE_DESC_OFFS = 08h    ; Code Descriptor Offset
-DATA_DESC_OFFS = 10h    ; Data Descriptor Offset
+CMOS_PORT_ID   = 70h         ; Port for CMOS memory access	
+CODE_DESC_OFFS = 08h         ; Code Descriptor Offset
+DATA_DESC_OFFS = 10h         ; Data Descriptor Offset
+STACK_BASE     = 1024*1024*5 ; 
+VIDEO_BASE     = 0B8000h     ; Video memory for color monitors
 
 	jmp start  ;  Marker to place, where program starts	
 	
@@ -29,6 +31,9 @@ switchToPm:
 	mov ds, ax                      ; 
 	mov es, ax                      ; Selector of Data Segment
 	mov ss, ax                      ; 
+	mov esp, STACK_BASE             ;
+	call remap_irq                  ; Remaps IRQ
+	call printVideoMem              ; Prints test output in Video Memory
 	ret                             ;
 	
 setGDTpar:
@@ -41,7 +46,66 @@ setGDTpar:
 	mov dword ptr [(GDTR+2)], eax   ; Setting Address  
 	pop bx                   		; Recover bx
 	ret                      		;
+
+; Testing print
+printVideoMem:
+	mov edi, VIDEO_BASE             ; Setting VIDEO_BASE
+	mov [edi], 'P'                  ;
+	mov [edi + 1], 07h              ; Grey-On-Black
+	mov [edi + 2], 'M'              ;
+	mov [edi + 3], 07h              ; Grey-On-Black
+	ret      
+
+
+;set_int_vectors:
+;	pusha                           ; Save all registers
+;	push exGP_handler               
+;	push 13
+;	push IDT
+;	call set_handler
+;	add esp, 3*4
+
+;	popa
+;	ret
+
+;exGP_handler:
+;	mov edi, VIDEO_BASE
+;	mov byte[edi],'G'
+;	mov byte[edi+2],'P'
+;	ret
+
+; Remaps the external interrupts
+remap_irq:
+	mov al, 11h
+	out 20h,al		; Initialize master PIC
 	
+	mov al, 11h
+	out 0A0h,al		; Initialize slave PIC
+	
+	mov al, 20h
+	out 21h, al		; Int 0 should be at 20h int
+	
+	mov al, 28h
+	out 0A1h,al		; int 8 should be at 28h
+	
+	mov al, 04h
+	out 21h,al		; Tell the master PIC that IRQ line 2 is mapped to the slave PIC
+	
+	mov al, 02h
+	out 0A1h,al		; Tell the slave PIC that IRQ line 2 is mapped to the master PIC
+	
+	mov al, 01h
+	out 21h, al		; Setting bit 0 enables 80x86 mode
+   
+	mov al, 01h
+	out 0A1h,al		;Setting bit 0 enables 80x86 mode
+   
+	xor al,al
+	out 21h, al
+	out 0A1h,al
+	
+	ret 
+
 ; Disables Maskable && Non-Maskable interrupts
 disable_interrupts:
 	xor eax, eax         ;
