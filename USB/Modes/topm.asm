@@ -5,39 +5,67 @@
 
 _:
 
-; CONSTS
+	jmp start  ;  Marker to place, where program starts	
+
+; INT CONSTS
 CMOS_PORT_ID   = 70h         ; Port for CMOS memory access	
 CODE_DESC_OFFS = 08h         ; Code Descriptor Offset
 DATA_DESC_OFFS = 10h         ; Data Descriptor Offset
 STACK_BASE     = 1024*1024*5 ; 
 VIDEO_BASE     = 0B8000h     ; Video memory for color monitors
-
+; Temp Storage
 ss_prev dw 0h                ; Right stack  buffer
 
-	jmp start  ;  Marker to place, where program starts	
-	
+savecr0 dd 0                 ; CR0	
+
+idt_real:
+	dw 0x3ff				; 256 entries, 4b each = 1K
+	dd 0					; Real Mode IVT @ 0x0000
+
 start:
 
 set_prot_mode:
 
-	call enable_interrupts   		; Disable Maskable && Non-Maskable interrupts
+	call disable_interrupts   		; Disable Maskable && Non-Maskable interrupts
 	call setGDTpar           		; Calculate GDT size
 	mov edi, dword ptr [GDTR]		; Load argument
 	lgdt [edi]               		;  
 	call CODE_DESC_OFFS:switchToPm  ; Setting in CS register Code Selector  
 	call enable_interrupts          ; Enable Maskable && Non-Maskable interrupts
-	jmp outOfProg            		;
+	jmp outOfProg                   ; End program
+	
+	; moving to Real Mode
+	mov eax, cr0
+	mov dword ptr [savecr0], eax
+	and eax, 7FFFFFFEh	            ; Disable paging bit & enable 16-bit pmode.
+	mov cr0, eax           		
+
+
+	jmp 0:switchToRm		       ; Perform Far jump to set CS.
+ 
+switchToRm:
+	mov ax, 80h                    ;
+	mov sp, ax		               ; pick a stack pointer.
+	mov ax, word ptr [ss_prev]	   ; Reset segment registers to 0.
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov ss, ax
+	lidt dword ptr [idt_real]
+	
 
 switchToPm:
+	mov word ptr [ss_prev], ds      ;
 	mov ax, DATA_DESC_OFFS          ; Setting Data Selector
 	mov ds, ax                      ; 
 	mov es, ax                      ; Selector of Data Segment
-	;mov ss, ax                     ; Figure out problems with stack! 
-	;mov esp, STACK_BASE            ;
-	call printVideoMem              ; Prints test output in Video Memory
+	mov ss, ax                      ; Figure out problems with stack! 
+	mov esp, STACK_BASE             ;  	
 	;call remap_irq                 ; Remaps IRQ
-	ret                             ;
-	
+	call printPMGreating            ; Prints test output in Video Memory
+
+	ret
+
 setGDTpar:
 	xor eax, eax             		;
 	push bx                  		; Save bx
@@ -49,17 +77,56 @@ setGDTpar:
 	pop bx                   		; Recover bx
 	ret                      		;
 
-; Testing print
-printVideoMem:
+; Simple Video Mem Case
+printPMGreating:
+	push edi                 ; Saves edi
+	push bx                  ; Saves bx
+	push ax                  ;
+	mov edi, VIDEO_BASE      ; Pointer to Video Mem 
+	mov bl, 05h              ; DOS-Print Style
+	
+	mov al, 'P'
+	mov [edi], al          
+	mov [edi+1], bl           
+
+	mov al, 'M'
+	mov [edi+2], al                     
+	mov [edi+3], bl          
+           
+	mov al, ' '
+	mov [edi+4], al          
+	mov [edi+5], bl
+           
+	mov al, 'm'
+	mov [edi+6], al          
+	mov [edi+7], bl  
+	           
+	mov al, 'o'
+	mov [edi+8], al          
+	mov [edi+9], bl 
+         
+	mov al, 'd'
+	mov [edi+10], al          
+	mov [edi+11], bl 
+           
+	mov al, 'e'
+	mov [edi+12], al          
+	mov [edi+13], bl 
+
+	pop edi                  ; Recover
+	pop bx                   ;
+	pop ax                   ;
+	ret
+
+; Printing string. Address in stack
+stringPrinter:
 	
 	push bx                  ;
 	push edi                 ;
 	push ax                  ;
 	push cx                  ; Counter
-	
 	xor dx, dx               ; Clear 
 	xor cx, cx               ;
-
 	mov dl, 07h              ; Color
 	mov edi, VIDEO_BASE      ; Setting VIDEO_BASE
 	add edi, (80*20)         ; Displacement for print
@@ -80,13 +147,12 @@ printVideoMem:
 	jmp printChar             ;
   
    outPrint:
-		
 	pop bx
 	pop edi
 	pop ax
-	pop cx
-	
+	pop cx	
 	ret      
+
 
 ; Remaps the external interrupts
 remap_irq:
@@ -148,6 +214,7 @@ enable_interrupts:
 	sti                  ; Enable Maskable interrupt
 	ret                  ;
 
+
 ; The main Global Descriptors Table (GDT), 8192 records 
 GDT_COUNT = 8192
 
@@ -166,9 +233,10 @@ GDT_size = (GDT_DESCR - GDT)
 GDTR	dw (GDT_size-1) 
 		dd 0h
 
-pm_str db 'PM Mode$'
+TERMINATE db 0CDh, 20h
 
 outOfProg:
+	jmp outOfProg            		;
 	
 	ret
 	end _
