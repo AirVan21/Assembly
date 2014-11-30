@@ -14,6 +14,9 @@ DATA_DESC_OFFS = 10h         ; Data Descriptor Offset
 STACK_BASE     = 1024*1024*5 ; 
 VIDEO_BASE     = 0B8000h     ; Video memory for color monitors
 
+USB1_BAR       = 0C360A0000h ; BAR from 1-st device 
+USB2_BAR       = 0C36090000h ; BAR from 2-nd device
+
 start:
 
 set_prot_mode:
@@ -27,13 +30,11 @@ set_prot_mode:
 	jmp outOfProg                   ; End program
 
 switchToPm:
-	mov word ptr [ss_prev], ds      ;
 	mov ax, DATA_DESC_OFFS          ; Setting Data Selector
 	mov ds, ax                      ; 
 	mov es, ax                      ; Selector of Data Segment
 	mov ss, ax                      ; Figure out problems with stack! 
 	mov esp, STACK_BASE             ;  	
-	call printPMGreating            ; Prints test output in Video Memory
 	ret
 
 setGDTpar:
@@ -62,66 +63,13 @@ printPMGreating:
 	mov al, 'M'
 	mov [edi+2], al                     
 	mov [edi+3], bl          
-           
-	mov al, ' '
-	mov [edi+4], al          
-	mov [edi+5], bl
-           
-	mov al, 'm'
-	mov [edi+6], al          
-	mov [edi+7], bl  
-	           
-	mov al, 'o'
-	mov [edi+8], al          
-	mov [edi+9], bl 
-         
-	mov al, 'd'
-	mov [edi+10], al          
-	mov [edi+11], bl 
-           
-	mov al, 'e'
-	mov [edi+12], al          
-	mov [edi+13], bl 
-
+          
 	pop edi                  ; Recover
 	pop bx                   ;
 	pop ax                   ;
 	ret
 
-; Printing string. Address in stack
-stringPrinter:
-	
-	push bx                  ;
-	push edi                 ;
-	push ax                  ;
-	push cx                  ; Counter
-	xor dx, dx               ; Clear 
-	xor cx, cx               ;
-	mov dl, 07h              ; Color
-	mov edi, VIDEO_BASE      ; Setting VIDEO_BASE
-	add edi, (80*20)         ; Displacement for print
-	
-   printChar:
-	xor ebx, ebx
-	lea ebx, pm_str
-        add bx, cx             ;
-	mov al, [5F8Eh:bx]        ; Char From string
-	cmp al, '$'               ;
-	jz outPrint               ;
-	shl cx, 1                 ;
-	mov bx, cx                ;
-	add ebx, edi              ;
-	mov [ebx], al             ;    
-	mov [ebx + 1], dl         ;
-	add cx, 1
-	jmp printChar             ;
-  
-   outPrint:
-	pop bx
-	pop edi
-	pop ax
-	pop cx	
-	ret      
+     
 
 ; Disables Maskable && Non-Maskable interrupts
 disable_interrupts:

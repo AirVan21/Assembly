@@ -42,6 +42,41 @@ wait_reset:
 	jmp outOfProg         ;
 
 outOfProg:
+
+
+/*
+	Last Edition
+*/
+
++ 
+
+; Temp Storage
+ss_prev dw 0h                ; Right stack  buffer
+
+savecr0 dd 0                 ; CR0	
+
+idt_real:
+	dw 0x3ff				; 256 entries, 4b each = 1K
+	dd 0					; Real Mode IVT @ 0x0000
+
+
+	; moving to Real Mode
+	;mov eax, cr0
+	;mov dword ptr [savecr0], eax
+	;and eax, 7FFFFFFEh	            ; Disable paging bit & enable 16-bit pmode.
+	;mov cr0, eax           		
+	;jmp 0:switchToRm		       ; Perform Far jump to set CS.
+ 
+;switchToRm:
+;	mov ax, 80h                    ;
+;	mov sp, ax		               ; pick a stack pointer.
+;	mov ax, word ptr [ss_prev]	   ; Reset segment registers to 0.
+;	mov ds, ax
+;	mov es, ax
+;	mov fs, ax
+;	mov ss, ax
+;	lidt dword ptr [idt_real]
+
 	
 	ret
 	end _
