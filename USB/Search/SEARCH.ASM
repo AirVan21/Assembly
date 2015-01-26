@@ -26,6 +26,8 @@ start:
 
 	mov ecx, (DEFAULT_ADDR + CLASS_SUBCLASS); Setting PCI Address 
 
+; Main search function
+
 search:
 	mov eax, ecx          ; for OUT command
 	mov dx, CONFIG_ADDR   ; sets out PORT address
@@ -38,7 +40,8 @@ search:
 	jz nextDevice          ; if (invalid) then handle next device      
 	call getPCIInfo        ; Extract valuable info 
 	jmp nextFunction       ; Goes to check next function		
-	
+
+; Function, which prints Word(16-bit) from Stack 	
 printWordFromStack:
 
 	xor  eax, eax          ; Clear
@@ -74,6 +77,7 @@ cycle:
 	pop dx                 ;
 	ret                    ;
 
+; Function, which prints Byte (8-bit) from Stack
 printByteFromStack:
 	xor eax, eax           ;
 	pop bx                 ; pop 'ret' address
@@ -110,7 +114,7 @@ getPCIInfo:
 	pop  eax               ; Recover EAX
 	jz   getUSBInfo        ; Handle USB
 	ret                    ;
-
+; Handles USB device
 getUSBInfo:
 	push si                ; Save, help for storage
 	push dx                ;
@@ -139,6 +143,7 @@ getUSBInfo:
 	pop si                 ;
 	ret                    ; Out from getPCIinfo call
 
+; Prints information about USB class
 displayUSBtype:            ; ax - parameter
 	cmp ax, 0h             ;
 	jz  showusb00          ; UHCI
@@ -186,7 +191,7 @@ displayBARS:
 	lea dx, space          ; Correct Output
 	int 21h                ; 
 	; Beauty part
-	mov cx, 1              ; Amount of bars SET this variable!
+	mov cx, 6              ; Amount of bars SET this variable!
    
    cycbar:
 	mov eax, esi           ; USB Device PCI Address (ecx) 
@@ -195,6 +200,8 @@ displayBARS:
 	out dx, eax            ; sends request
 	mov dx, CONFIG_DATA    ; sets input PORT address
 	in  eax, dx            ; gets data from PCI device
+	cmp ax, 0h             ; valid if nonzero
+	jz nextbar             ; jump to next bar 
 	mov di,  ax            ; save lower 16 bits
 	shr eax, 16            ; set alone high 16 bits
 	push ax                ; 
@@ -204,6 +211,9 @@ displayBARS:
 	mov ah, 09h            ; Printing new line
 	lea dx, newLine        ;
 	int 21h                ; 
+ 
+   nextbar:	
+
 	loop cycbar            ; loop it
 	
 	pop di                 ; Recover
@@ -236,6 +246,7 @@ newLine   db 13, 10, '$'
 bars      db ' BARs (0-5):$'
 space     db '   $'
 outOfProgram:
+
 	ret
 	end _
 		
