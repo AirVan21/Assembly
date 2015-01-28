@@ -4,29 +4,25 @@
 
 	org 100h          		 ;  Going to create .COM file
 
+main proc far
+
 _:
 
-	jmp start  ;  Marker to place, where program starts	
+	jmp start  				  ;  Marker to place, where program starts	
 
 ; INT CONSTS
-CMOS_PORT_ID   = 70h         ; Port for CMOS memory access	
+CMOS_PORT_ID   = 70h          ; Port for CMOS memory access	
 
-VIDEO_BASE     = 0B8000h     ; Video memory for color monitors
-CODE_LIMIT     = 1024        ;
-STACK_LIMIT    = 1024        ; 
-GDT_SIZE       = (GDT - GDT_end) - 1;
-
-; GDT parameters
-GDTR	label	fword
-
-GDT_lim		dw	?
-GDT_adr		dd	?
+VIDEO_BASE     = 0B8000h      ; Video memory for color monitors
+CODE_LIMIT     = 1024         ;
+STACK_LIMIT    = 1024         ; 
+GDT_SIZE       = (GDT_end - GDT) - 1
 
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
 STACK_SELECTOR   = 16         ; Stack 
-DATA_SELECTOR    = 24h        ; Data 
-SCREEN_SELECTOR  = 32h        ; Data
+DATA_SELECTOR    = 24         ; Data 
+SCREEN_SELECTOR  = 32         ; Data
 
 ; ACCESS RIGHTS 
 CODE_ACCESS_R    = 10011000b  ; P ; DPL ; S ; Type ; A ;
@@ -57,9 +53,10 @@ set_prot_mode:
 	                                ; DS is set
 	push cs                         ; For Code Segment Address
 	pop ax                          ; 
-	shl eax, 4h                     ; Code Segment Address
-	mov edx, 2048                   ; Simple segment limit
+	shl eax, 4                      ; Code Segment Address
+	mov dx, CODE_LIMIT              ; Simple segment limit
 	mov cl, CODE_ACCESS_R           ; Code access rights
+	
 	call setDescriptor              ; 
 	
 	; Sets Stack Descriptor
@@ -67,40 +64,42 @@ set_prot_mode:
 	add eax, edx                    ; Code Segment Address + Mark offset
 	mov dx, STACK_LIMIT             ; Stack limit
 	mov cl, STACK_ACCESS_R          ; Stack access rights
+	
 	call setDescriptor              ;
 
 	; Sets Data Descriptor
 	xor eax, eax                    ;
-	xor edx, edx                    ;
-	push ds                         ; For Code Segment Address
-	pop ax                          ; 
-	shl eax, 04h                    ; Code Segment Address
+	mov ax, ds                      ;
+	shl eax, 4                      ; Code Segment Address
 	xor ecx, ecx                    ;
 	lea cx, DATA_SEG_START          ; Data Segment Start Address
 	add eax, ecx                    ; 
 	lea dx, DATA_SEG_END            ; Data Limit Calculation
 	sub dx, cx                      ; Correct Data Limit in cx
 	mov cl, DATA_ACCESS_R           ; Data access right 
+	
 	call setDescriptor              ;
 
 	; Sets Screen Descriptor
 	mov eax, VIDEO_BASE             ; Video Segment Address
 	mov	edx, 4000	                ; Video Segment Size (80 * 25 * 2 = 4000).
 	mov cl, SCREEN_ACCESS_R         ; Screen access rights
+	
 	call setDescriptor              ;
 
+	
 	call setParamGDT           		; Calculate GDT address, size
 	
-	;call disable_interrupts         ; Disables interrupts
-	cli                             ;
+	
+	call disable_interrupts        ; Disables interrupts
 	
 	lgdt GDTR               		; Load GDT   
 	
 	; Moving to Protected Mode 
 	mov	eax, cr0                    ; Getting signalling register
 	or	al, 1                       ; Sets bit for Protected mode
-	mov	cr0, eax                     ; Save changes
-
+	mov	cr0, eax                    ; Save changes
+        
 	;call enable_interrupts          ; Enables interrupts
 
 
@@ -109,84 +108,6 @@ set_prot_mode:
 	dw printInVMem                  ; Argument for jump command
 	dw CODE_SELECTOR                ; Argument for jump command
 	
-
-setParamGDT:
-	push eax                        ; Save eax
-	push edx                        ; Save edx
-	xor eax, eax             		;
-	
-	mov ax, ds               		; Segment Address
-	shl eax, 4               		; Segment * 10h (alignment)
-	lea dx, GDT              		; Offset
-	add eax, edx               		; Linear Address calc
-	mov GDT_adr, eax                ; Setting Address  
-	mov GDT_lim, 79                 ;
-	pop edx                  		; Recover bx
-	pop eax                         ; Recover eax
-	ret  
-
-; Sets Descriptor
-; Parameters:
-; DS:BX - Descriptor in GDT
-; EAX   - Segment address
-; EDX   - Segment limit
-; CL    - Access rights
-
-setDescriptor:
-	push eax                       ; Save eax
-	push ecx                       ; Save ecx
-	push cx                        ; Save Acess rights
-	
-	mov cx, ax                     ; Copy first (Jr) part of Address
-	shl ecx, 10h                   ; Shift 
-	mov cx, dx                     ; Copy first (Jr) part of Limit
-
-	mov [bx], ecx                  ; Writing descriptors first (Jr) part 
-
-	shr eax, 10h                   ; Shift 16-bit (Second part of Address now)
-	mov cl, ah                     ; To cl bit (24-31) from Address  (Part 1)
-	shl ecx, 18h                   ; Kill ecx byte
-	mov cl, al                     ; To cl bit (16-23) from Address  (Part 2)
-
-	pop ax                         ; Get Acess right 
-	mov ch, al                     ; Acess to 2-nd ecx byte
-                                   ; Oldest Limit part is zero
-                                   ; G D X U      part is zero
-    mov [bx + 4], ecx              ; Writing descriptors second part
-    
-    add bx, 8                      ; Add 8 bytes to access next descriptor 
-	
-	pop ecx                        ; Recover ecx
-	pop eax                        ; Recover eax                       
-	ret
-
-; Disables Maskable && Non-Maskable interrupts
-disable_interrupts:
-	xor eax, eax         ;
-	push dx              ; Save dx
-	xor dx, dx           ;
-	cli                  ; Blocking Maskable Interrupts
-	mov dx, CMOS_PORT_ID ; (Params should be registers)
-	in  al, dx           ; Getting CMOS-byte
-	or  al, 80h          ; First bit for Non-Maskable
-	                     ; 0 - Enabled, 1 - Disables
-	out dx, al           ; Disabling NMI 
-	pop dx               ; Recover dx
-	ret                  ;
-
-; Enables Maskable && Non-Maskable interrupts
-enable_interrupts:
-	xor eax, eax         ;
-	push dx              ; Save dx
-	xor dx, dx           ;
-	mov dx, CMOS_PORT_ID ; 
-	in  al, dx           ; Getting CMOS-byte
-	and al, 7Fh          ; Setting first bit to zero 
-	                     ; 0 - Enables NMI
-	out dx, al           ;
-	pop dx               ; Recover dx
-	sti                  ; Enable Maskable interrupt
-	ret                  ;
 
 printInVMem:
 	; Sets appropriate selectors
@@ -201,6 +122,8 @@ printInVMem:
 	mov	ss, ax           ; Points to prepared stack descriptor  
 	mov	sp, 0
 	
+	xor edi, edi	
+
 	; Выводим ZS-строку:
 
 	mov	bx, 0	; DS:BX = указатель на начало ZS-строки. Адрес
@@ -214,11 +137,11 @@ printInVMem:
 				;  видеопамяти (оно соответствует началу
 				;  3-й строки на экране в текстовом режиме).
 	
-	mov	ah, 1bh		; В AH будет атрибут вывода - светло-циановые
+	mov	ah, 1bh	; В AH будет атрибут вывода - светло-циановые
 				;  символы на синем фоне.
 
 putzs_1:
-	mov	al,[ bx ]	; Читаем байт из ZS-строки.
+	mov	al, [bx]	; Читаем байт из ZS-строки.
 	inc	bx		; Переводим указатель на следующий байт.
 	cmp	al,0		; Если байт равен 0,
 	je	putzs_end	; то переходим в конец процедуры.
@@ -228,7 +151,7 @@ putzs_1:
 				;  смещению - цветной символ появится на
 				;  экране.
 
-	add	di,2		; Переводим указатель в видеопамяти на
+	add	di, 2		; Переводим указатель в видеопамяти на
 				;  позицию следующего символа. 
 
 	jmp	putzs_1	; Повторяем процедуру для следующего байта
@@ -236,21 +159,111 @@ putzs_1:
 
 putzs_end:
 
-	;pop	di
-	;pop	es
-	;pop	bx
-	;pop	ax
-	
-; Зацикливаем программу:
+; Cycle
 
 loop_1:
-	
 	jmp	loop_1
+
+
+setParamGDT:
+	
+	push eax                        ; Save eax
+	push edx                        ; Save edx
+	
+	xor eax, eax             		;
+	
+	mov ax, ds               		; Segment Address
+	shl eax, 4              	    ; Segment (alignment)
+	lea dx, GDT              		; Offset
+	add eax, edx               		; Linear Address calc
+	mov GDT_adr, eax                ; Setting Address  
+	mov dx, GDT_SIZE                ;
+	mov GDT_lim, dx                 ;
+	
+	pop edx                  		; Recover bx
+	pop eax                         ; Recover eax
+	
+	db 0C3h                         ; ret
+
+; Sets Descriptor
+; Parameters:
+; DS:BX - Descriptor in GDT
+; EAX   - Segment address
+; EDX   - Segment limit
+; CL    - Access rights
+
+setDescriptor:
+	
+	push eax                       ; Save eax
+	push ecx                       ; Save ecx
+	push cx                        ; Save Acess rights
+	
+	mov cx, ax                     ; Copy first (Jr) part of Address
+	shl ecx, 16                    ; Shift 
+	mov cx, dx                     ; Copy first (Jr) part of Limit
+
+	mov [bx], ecx                  ; Writing descriptors first (Jr) part 
+
+	shr eax, 16                    ; Shift 16-bit (Second part of Address now)
+	mov cl, ah                     ; To cl bit (24-31) from Address  (Part 1)
+	shl ecx, 24                    ; Kill ecx byte
+	mov cl, al                     ; To cl bit (16-23) from Address  (Part 2)
+
+	pop ax                         ; Get Acess right 
+	mov ch, al                     ; Acess to 2-nd ecx byte
+                                   ; Oldest Limit part is zero
+                                   ; G D X U      part is zero
+    mov [bx + 4], ecx              ; Writing descriptors second part
+    
+    add bx, 8                      ; Add 8 bytes to access next descriptor 
+	
+	pop ecx                        ; Recover ecx
+	pop eax                        ; Recover eax                       
+	
+	db 0C3h                        ; ret
+
+; Disables Maskable && Non-Maskable interrupts
+disable_interrupts:
+	
+	xor eax, eax         ;
+	push dx              ; Save dx
+	xor dx, dx           ;
+	cli                  ; Blocking Maskable Interrupts
+	mov dx, CMOS_PORT_ID ; (Params should be registers)
+	in  al, dx           ; Getting CMOS-byte
+	or  al, 80h          ; First bit for Non-Maskable
+	                     ; 0 - Enabled, 1 - Disables
+	out dx, al           ; Disabling NMI 
+	pop dx               ; Recover dx
+	
+	db 0C3h              ; ret
+
+; Enables Maskable && Non-Maskable interrupts
+enable_interrupts:
+	
+	xor eax, eax         ;
+	push dx              ; Save dx
+	xor dx, dx           ;
+	mov dx, CMOS_PORT_ID ; 
+	in  al, dx           ; Getting CMOS-byte
+	and al, 7Fh          ; Setting first bit to zero 
+	                     ; 0 - Enables NMI
+	out dx, al           ;
+	pop dx               ; Recover dx
+	sti                  ; Enable Maskable interrupt
+	
+	db 0C3h              ; ret
 
 ; =====================================================================================================
 
+; GDT parameters
+GDTR	label	fword
+
+GDT_lim		dw	?
+GDT_adr		dd	?
+
+
 ; The main Global Descriptors Table (GDT) (shuold have 8192 records) 
-GDT_COUNT = 8192
 
 GDT:
 
@@ -263,11 +276,13 @@ GDT:
 ; [Address(31-24) ; G ; D ; X ; U ; Limit(19-16) ; P ; DPL ; S ; Type ; A ; Address(23-0) ; Limit(15-0)]
 ; 63           56  55  54  53  52   51        48  47  46 45 44   43 41 40   39         16   15        0
 
-	dd 0h, 0h  ; Setting zeros for (all records)
-	dd 0h, 0h	
-	dd 0h, 0h
-	dd 0h, 0h
-	dd 0h, 0h
+; Setting zeros for (all records)
+
+	dd 	?, ?  
+	dd 	?, ?	
+	dd 	?, ?
+	dd 	?, ?
+	dd 	?, ?
 
 GDT_end:
 
@@ -276,21 +291,18 @@ GDT_end:
 
 DATA_SEG_START:
 
-db "Hello, world!", 0
+db "Hello, world! Protected mode on!",0
 
 DATA_SEG_END:
 
 ; ======================================================================================================
 ; Stack Part
 
-db	1024 DUP (0)	; Memory which reserved for stack
+	db 1024 DUP (0)	; Memory which reserved for stack
 
 STACK_SEG_START:	; Mark for stack
 
-outOfProg:
 	
-	ret
-	
+	main endp
 	pmode ends
-	
 	end _
