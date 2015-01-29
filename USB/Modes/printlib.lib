@@ -1,0 +1,28 @@
+initPMprint	macro
+	
+	; Prints string while (charToPrint != '$')
+	;
+	; DS - data segment   pointer
+	; ES - screen segment pointer
+	; BX - offset in printing string
+	; DI - offset for printing string in Video Mem
+	; AH - print style
+	printStrPM proc near
+
+	putChar:
+
+		mov al, [bx]		; Get char to print
+		cmp al, '$'         ;
+		jz outPutChar       ; Stop printing
+		add bx, 1           ;
+		mov es:[di], ax     ; Puts char & font in video mem
+		add di, 2           ; Points to next place in video mem
+
+		jmp putChar         ;  
+	
+	outPutChar:
+		
+		ret 
+	
+	endp
+endm
