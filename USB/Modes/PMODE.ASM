@@ -1,3 +1,4 @@
+	include printlib.lib
 	.386p
 	pmode segment use16
 	assume	cs:pmode, ds:pmode, es:pmode
@@ -100,71 +101,47 @@ set_prot_mode:
 	or	al, 1                       ; Sets bit for Protected mode
 	mov	cr0, eax                    ; Save changes
         
-	;call enable_interrupts          ; Enables interrupts
+	;call enable_interrupts          ; Enables interrupts should be done later
 
 
 	; We are in protected mode      ;
 	db 0eah	                        ; far jmp CODE_SELECTOR : pmCode 
-	dw printInVMem                  ; Argument for jump command
+	dw setMainRegister              ; Argument for jump command
 	dw CODE_SELECTOR                ; Argument for jump command
 	
 
-printInVMem:
+setMainRegister:
+
 	; Sets appropriate selectors
 
 	mov	ax, SCREEN_SELECTOR
-	mov	es, ax           ; Points to prepared screen descriptor 
+	mov	es, ax           			; Points to prepared screen descriptor 
 
 	mov	ax, DATA_SELECTOR
-	mov	ds,ax			 ; Points to prepared data descriptor 
+	mov	ds,ax			 			; Points to prepared data descriptor 
 
 	mov	ax, STACK_SELECTOR
-	mov	ss, ax           ; Points to prepared stack descriptor  
+	mov	ss, ax           			; Points to prepared stack descriptor  
 	mov	sp, 0
 	
-	xor edi, edi	
+	jmp printInVMem      
 
-	; Выводим ZS-строку:
-
-	mov	bx, 0	; DS:BX = указатель на начало ZS-строки. Адрес
-			;  сегмента данных определён по метке
-			;  PMode_data_start, а строка начинается сразу после
-			;  этой метки, её смещение от метки равно 0,
-			;  следовательно, это и будет смещение от начала
-			;  сегмента данных.
-
-	mov	di, 480		; Выводим ZS-строку со смещения 480 в
-				;  видеопамяти (оно соответствует началу
-				;  3-й строки на экране в текстовом режиме).
+; Prints string to Video Memory
+printInVMem:
 	
-	mov	ah, 1bh	; В AH будет атрибут вывода - светло-циановые
-				;  символы на синем фоне.
+	xor edi, edi	
+	mov	bx, 0						; DS:BX Points on string to print 
+	mov	di, 480						; Displacement in Video Mem (3rd Row)	
+	mov	ah, 05h						; Print style
+	
+	call printStrPM                 ; Print string in Video Memory
 
-putzs_1:
-	mov	al, [bx]	; Читаем байт из ZS-строки.
-	inc	bx		; Переводим указатель на следующий байт.
-	cmp	al,0		; Если байт равен 0,
-	je	putzs_end	; то переходим в конец процедуры.
-
-	mov	es:[di],ax	; Иначе - записываем символ вместе с
-				;  атрибутом в видеопамять по заданному
-				;  смещению - цветной символ появится на
-				;  экране.
-
-	add	di, 2		; Переводим указатель в видеопамяти на
-				;  позицию следующего символа. 
-
-	jmp	putzs_1	; Повторяем процедуру для следующего байта
-				;  из ZS-строки.
-
-putzs_end:
-
-; Cycle
-
-loop_1:
-	jmp	loop_1
+loop_dead:                             ; Dead loop
+	
+	jmp	loop_dead
 
 
+; Fill correct parameters for GDT register
 setParamGDT:
 	
 	push eax                        ; Save eax
@@ -191,7 +168,6 @@ setParamGDT:
 ; EAX   - Segment address
 ; EDX   - Segment limit
 ; CL    - Access rights
-
 setDescriptor:
 	
 	push eax                       ; Save eax
@@ -255,7 +231,11 @@ enable_interrupts:
 	db 0C3h              ; ret
 
 ; =====================================================================================================
+; Extra libs
 
+initPMprint
+
+; =====================================================================================================
 ; GDT parameters
 GDTR	label	fword
 
@@ -291,7 +271,7 @@ GDT_end:
 
 DATA_SEG_START:
 
-db "Hello, world! Protected mode on!",0
+db "Hello, world! Protected mode on!$"
 
 DATA_SEG_END:
 
