@@ -24,6 +24,8 @@ CODE_SELECTOR    = 8          ; Code
 STACK_SELECTOR   = 16         ; Stack 
 DATA_SELECTOR    = 24         ; Data 
 SCREEN_SELECTOR  = 32         ; Data
+RM_CODE_SELECTOR = 40         ; Real Mode Code
+RM_DATA_SELECTOR = 48         ; Real Mode Data
 
 ; ACCESS RIGHTS 
 CODE_ACCESS_R    = 10011000b  ; P ; DPL ; S ; Type ; A ;
@@ -34,7 +36,9 @@ CODE_ACCESS_R    = 10011000b  ; P ; DPL ; S ; Type ; A ;
 					          ; A    = 0b   Access
 STACK_ACCESS_R   = 10010110b  ;
 DATA_ACCESS_R    = 10010010b  ;
-SCREEN_ACCESS_R  = 10010010b  ; 	
+SCREEN_ACCESS_R  = 10010010b  ;
+RM_CODE_ACCESS_R = 10011010b  ; 
+RM_DATA_ACCESS_R = 10010010b  ; 	
 
 start:
 
@@ -99,8 +103,22 @@ set_prot_mode:
 	
 	call setParamGDT           		; Calculate GDT address, size
 	
+	; Sets extra RM Code Descriptor
+	xor eax, eax                    ;
+	push cs                         ; Code Segment
+	pop ax                          ; AX = CS 
+	shl eax, 4                      ;
+	mov edx, 0ffffh                 ; Limit 64K 
+	mov cl, RM_CODE_ACCESS_R        ; 
+
+	call setDescriptor              ;
 	
-	call disable_interrupts        ; Disables interrupts
+	; Sets extra RM Data Descriptor 
+	mov cl, RM_DATA_ACCESS_R        ;
+
+	call setDescriptor              ; 
+
+	call disable_interrupts         ; Disables interrupts
 	
 	lgdt GDTR               		; Load GDT   
 	
@@ -141,12 +159,13 @@ printInVMem:
 	mov	bx, 0						; DS:BX Points on string to print 
 	mov	di, 480						; Displacement in Video Mem (3rd Row)	
 	mov	ah, 05h						; Print style
-	
 	call printStrPM                 ; Print string in Video Memory
-
-loop_dead:                             ; Dead loop
 	
-	jmp	loop_dead
+	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
+
+;loop_dead:                             ; Dead loop
+	
+;	jmp	loop_dead
 
 
 ; Fill correct parameters for GDT register
@@ -249,10 +268,55 @@ saveRMregisters:
 
 	db 0C3h              ; ret
 
+; Pre Real Mode Code Part 
+; Load SS, DS, ES, FS, GS 
+; Limit = 64 KB
+; G = 0, E = 0, W = 1, P = 1
+preBackToRM:
+	
+	; Test output OK!
+	mov	bx, 0						; DS:BX Points on string to print 
+	mov	di, 0						; Displacement in Video Mem (3rd Row)
+	call printStrPM                 ; Print string in Video Memory
+	
+	mov ax, RM_DATA_SELECTOR ; Real Mode Data Selector 
+	; Load similar value
+	mov ss, ax              
+	mov ds, ax 
+	mov es, ax 
+	mov fs, ax 
+	mov gs, ax 
+	
+	; Drop PE first bit 
+	mov eax, cr0		; 	
+	and al, 0feh        ; Set last bit = 0
+	mov cr0, eax        ; Apply changes
+
+	db 0eah             ; Far jump RMODE_CS : RMODE_IP
+	
+	dw RMODE_IP         ; Argument
+	dw RMODE_CS         ; Argument
+
 ; Real mode code
 backToRM:
-	
-	db 0C3h              ; ret
+
+	; Recover Real Mode Registers	
+	mov ss, RMODE_SS    
+	mov es, RMODE_ES
+	mov fs, RMODE_FS
+	mov ds, RMODE_DS
+	mov gs, RMODE_GS
+	mov sp, RMODE_SP
+
+	call enable_interrupts ; Enables interrupts
+
+	lea dx, RMmsg       ; Points to string
+	mov ah, 09h         ; 
+	int 21h             ;
+
+	int 20h             ; Exit()
+
+	db 0C3h             ; ret
 
 
 
@@ -284,9 +348,14 @@ GDT:
 
 ; Setting zeros for (all records)
 
+	; Descriptors for Protected Mode
 	dd 	?, ?  
 	dd 	?, ?	
 	dd 	?, ?
+	dd 	?, ?
+	dd 	?, ?
+	
+	; Descriptors for Real Mode
 	dd 	?, ?
 	dd 	?, ?
 
