@@ -49,6 +49,14 @@ set_prot_mode:
 	xor eax, eax                    ;
 	xor edx, edx                    ;
 
+	call saveRMregisters            ; Saves registers from real mode  
+
+	mov RMODE_CS, cs                ; Saves code segment for returning to real mode
+	lea ax, backToRM                ; 
+	mov RMODE_IP, ax                ; Saves IP to start RM code 
+	
+	xor eax, eax                    ; 
+
 	; Sets Code Descriptor
 	mov bx, offset GDT + 8          ; Skip Null-Descriprot, point to CODE_DESCRIPTOR 
 	                                ; DS is set
@@ -230,6 +238,24 @@ enable_interrupts:
 	
 	db 0C3h              ; ret
 
+; Saves registers from real mode
+saveRMregisters:
+	; Moving values to defined memory
+	mov RMODE_SS, ss 
+	mov RMODE_DS, ds 
+	mov RMODE_ES, es 
+	mov RMODE_FS, fs
+	mov RMODE_GS, gs
+
+	db 0C3h              ; ret
+
+; Real mode code
+backToRM:
+	
+	db 0C3h              ; ret
+
+
+
 ; =====================================================================================================
 ; Extra libs
 
@@ -267,7 +293,7 @@ GDT:
 GDT_end:
 
 ; ======================================================================================================
-; Data Part
+; PM Data Part
 
 DATA_SEG_START:
 
@@ -276,13 +302,27 @@ db "Hello, world! Protected mode on!$"
 DATA_SEG_END:
 
 ; ======================================================================================================
-; Stack Part
+; PM Stack Part
 
 	db 1024 DUP (0)	; Memory which reserved for stack
 
 STACK_SEG_START:	; Mark for stack
 
-	
+; ======================================================================================================
+; Real mode data
+
+RMODE_SS dw 	?
+RMODE_SP dw 	?
+RMODE_DS dw 	?
+RMODE_ES dw 	?
+RMODE_GS dw 	?
+RMODE_FS dw 	?
+
+RMODE_CS dw     ?
+RMODE_IP dw		?	
+
+RMmsg db 13, 10, "Back in real mode!", 13, 10, "$"
+
 	main endp
 	pmode ends
 	end _
