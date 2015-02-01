@@ -122,14 +122,13 @@ set_prot_mode:
 	
 	lgdt GDTR               		; Load GDT   
 	
+	mov RMODE_SP, sp                ; Saves Stack Pointer
+
 	; Moving to Protected Mode 
 	mov	eax, cr0                    ; Getting signalling register
 	or	al, 1                       ; Sets bit for Protected mode
 	mov	cr0, eax                    ; Save changes
         
-	;call enable_interrupts          ; Enables interrupts should be done later
-
-
 	; We are in protected mode      ;
 	db 0eah	                        ; far jmp CODE_SELECTOR : pmCode 
 	dw setMainRegister              ; Argument for jump command
@@ -259,6 +258,7 @@ enable_interrupts:
 
 ; Saves registers from real mode
 saveRMregisters:
+	
 	; Moving values to defined memory
 	mov RMODE_SS, ss 
 	mov RMODE_DS, ds 
@@ -275,9 +275,9 @@ saveRMregisters:
 preBackToRM:
 	
 	; Test output OK!
-	mov	bx, 0						; DS:BX Points on string to print 
-	mov	di, 0						; Displacement in Video Mem (3rd Row)
-	call printStrPM                 ; Print string in Video Memory
+	;mov	bx, 0						; DS:BX Points on string to print 
+	;mov	di, 0						; Displacement in Video Mem (3rd Row)
+	;call printStrPM                 ; Print string in Video Memory
 	
 	mov ax, RM_DATA_SELECTOR ; Real Mode Data Selector 
 	; Load similar value
@@ -293,9 +293,9 @@ preBackToRM:
 	mov cr0, eax        ; Apply changes
 
 	db 0eah             ; Far jump RMODE_CS : RMODE_IP
-	
-	dw RMODE_IP         ; Argument
-	dw RMODE_CS         ; Argument
+
+RMODE_IP dw    ?        ; Argument
+RMODE_CS dw    ?        ; Argument
 
 ; Real mode code
 backToRM:
@@ -309,11 +309,7 @@ backToRM:
 	mov sp, RMODE_SP
 
 	call enable_interrupts ; Enables interrupts
-
-	lea dx, RMmsg       ; Points to string
-	mov ah, 09h         ; 
-	int 21h             ;
-
+	
 	int 20h             ; Exit()
 
 	db 0C3h             ; ret
@@ -386,9 +382,6 @@ RMODE_DS dw 	?
 RMODE_ES dw 	?
 RMODE_GS dw 	?
 RMODE_FS dw 	?
-
-RMODE_CS dw     ?
-RMODE_IP dw		?	
 
 RMmsg db 13, 10, "Back in real mode!", 13, 10, "$"
 
