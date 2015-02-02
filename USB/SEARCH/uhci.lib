@@ -1,0 +1,83 @@
+initUHCI macro
+
+	
+;INT CONST
+
+; USB Host Controller I/O Registers
+; Registers offset from BAR 
+
+USBCMD    = 00h		; USB Command
+USBSTS    = 02h     ; USB Status
+USBINR    = 04h     ; USB Interrapt Enable
+FRNUM     = 06h     ; Frame Number
+FRBASEADD = 08h     ; Fram List Base Address
+SOFMOD    = 0Ch     ; Start of frame modify
+PORTSC1   = 10h     ; Port 1 Status 
+PORTSC2   = 12h     ; Port 2 Status
+
+; STRING CONST
+
+; [15-8] - reserved  
+; [7] Max Packet - 1 = 64 bytes, 0 = 32 bytes
+; [6] Configuration Flag
+; [5] Software Debug - 1 = Debug Mode, 0 = Normal Mode
+; [4] Force Global Resume - 1 = FGR On
+; [3] Enter Global Suspended Mode - 1 = EGSM On
+; [2] Global Reset  - 1 = Sending Global Reset
+; [1] Host Controller Reset
+; [0] Run(1) / Stop (0)
+USBCMD_NAME  db "USB Command : $"
+USBCMD_EX    db 13, 10, "0000h", 13, 10, "$"
+
+USBSTS_NAME  db "USB Status :  $"
+USBSTS_EX    db 13, 10, "0000h", 13, 10, "$"
+	
+	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address
+	printHCinfo proc near
+		
+		push eax			; Saves eax
+		push ebx            ; Saves ebx
+		push edx            ; Saves edx
+
+		; Prints info about USBCMD
+		mov ah, 09h         ;
+		lea dx, USBCMD_NAME ; String template
+		int 21h             ; Prints template
+
+		add bx, USBCMD 		; Offset for USBCMD 
+		mov ax, [ebx]       ; Gets USBCMD
+		push ax             ;
+
+		call printWordFromStackRM ; Prints USBCMD
+		sub bx, USBCMD      ; Default BAR value
+		
+		mov ah, 09h         ;
+		lea dx, USBCMD_EX   ; String template
+		int 21h             ; Prints template
+		
+		;Prints info about USBSTS
+
+		mov ah, 09h         ;
+		lea dx, USBSTS_NAME ; String template
+		int 21h             ; Prints template
+
+		add bx, USBSTS 		; Offset for USBCMD 
+		mov ax, [ebx]       ; Gets USBCMD
+		push ax             ;
+
+		call printWordFromStackRM ; Prints USBCMD
+		sub bx, USBSTS      ; Default BAR value
+		
+		mov ah, 09h         ;
+		lea dx, USBSTS_EX   ; String template
+		int 21h             ; Prints template
+		
+		pop edx             ; Recover registers
+		pop ebx             ;
+		pop eax         	;
+		ret
+	endp
+
+endm
