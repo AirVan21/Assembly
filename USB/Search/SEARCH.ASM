@@ -1,3 +1,4 @@
+	include printlib.lib
 	model tiny
 	.CODE
 	.486
@@ -41,70 +42,6 @@ search:
 	call getPCIInfo        ; Extract valuable info 
 	jmp nextFunction       ; Goes to check next function		
 
-; Function, which prints Word(16-bit) from Stack 	
-printWordFromStack:
-
-	xor  eax, eax          ; Clear
-	pop  bx                ; Pop ret address
-	pop  ax                ; Pop print value
-	push bx                ; Push ret value
-	push dx                ; Save DX
-	push di                ; Save DI
-	push si                ; Save SI
-	push cx                ; Save CX
-	mov di, ax             ; Storage for value to print
-	mov cx, 4              ; Cycle counter
-	lea bx, hex_table      ; Load in bx char table
-	mov si, 12             ; Shift counter
-
-cycle:
-	mov ax, di             ; Set default value
-	push cx                ; Save counter
-	mov cx, si             ; Shift value
-	shr ax, cl             ; Shift
-	and ax, 0Fh            ; Set digit alone
-	xlat                   ; Translate
-	mov dl, al             ; Result to DL 
-	mov ah, 02h            ; Print char code
-	int 21h                ; 
-	sub si, 4              ;
-	pop cx                 ;
-	loop cycle             ;
-	
-	pop cx                 ; Restore registers
-	pop si                 ;
-	pop di                 ;
-	pop dx                 ;
-	ret                    ;
-
-; Function, which prints Byte (8-bit) from Stack
-printByteFromStack:
-	xor eax, eax           ;
-	pop bx                 ; pop 'ret' address
-	pop ax                 ; pop print value
-	push bx                ; save 'ret; address
-	push dx                ; save 
-	push di                ; save
-	mov di, ax             ; Storage for print value
-	lea bx, hex_table      ; Translation table
-	
-	shr ax, 4              ; Set digit alone
-	xlat                   ; Translate
-	mov dl, al             ; Move result to dl
-	mov ah, 02h            ; Print char
-	int 21h                ;
-	
-	mov ax, di             ; Default value
-	and ax, 0Fh            ; Set digit alone
-	xlat                   ; Translate
-	mov dl, al             ; Move result to dl
-	mov ah, 02h            ; Print char
-	int 21h                ;
-	
-	pop di                 ; Recover
-	pop dx                 ;
-	ret                    ;
-
 getPCIInfo:
 	push eax               ; Save eax
 	push eax               ;
@@ -114,6 +51,7 @@ getPCIInfo:
 	pop  eax               ; Recover EAX
 	jz   getUSBInfo        ; Handle USB
 	ret                    ;
+
 ; Handles USB device
 getUSBInfo:
 	push si                ; Save, help for storage
@@ -126,13 +64,13 @@ getUSBInfo:
 	pop eax                ; 
 	shr eax, 16            ; Set alone word (Class && Subclass)
 	push ax                ; Parameter for print
-	call printWordFromStack; (Class && Subclass) 
+	call printWordFromStackRM; (Class && Subclass) 
 	pop eax                ;
 	shr eax, 8             ; (Getting Prog IF)
 	and ax, 00FFh          ; 
 	push ax                ;
 	mov si, ax             ; Saved Prog IF in SI
-	call printByteFromStack; (Prog IF)
+	call printByteFromStackRM; (Prog IF)
 	mov ax, si             ; Parameter for Definition in ax
 	call displayUSBtype    ; 
 	mov ah, 09h            ; 
@@ -174,7 +112,7 @@ outUSBtype:                ; Point to jump out of type definition
 	int 21h                ;
 	ret                    ;
 
-displayBARS:
+displayBARs:
 	push ecx               ; 
 	push dx                ;
 	push si                ;
@@ -205,9 +143,9 @@ displayBARS:
 	mov di,  ax            ; save lower 16 bits
 	shr eax, 16            ; set alone high 16 bits
 	push ax                ; 
-	call printWordFromStack; Printing 1-st part
+	call printWordFromStackRM; Printing 1-st part
 	push di                ; 
- 	call printWordFromStack; Printing 2-nd part
+ 	call printWordFromStackRM; Printing 2-nd part
 	mov ah, 09h            ; Printing new line
 	lea dx, newLine        ;
 	int 21h                ; 
@@ -235,7 +173,15 @@ nextFunction:
 	test ecx,800000h       ; First out of Bus digit
 	jz search              ; Next function iteration
 
+
+; =====================================================================================================
+; Extra libs
+
+initPrint
+
+; =====================================================================================================
 ; STRING CONST 
+
 hex_table db '0123456789ABCDEF'
 usb_00    db ' UHCI (Universal Host Controller)$'
 usb_10    db ' OHCI (Open Host Controller)$'
