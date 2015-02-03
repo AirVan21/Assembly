@@ -27,10 +27,10 @@ PORTSC2   = 12h     ; Port 2 Status
 ; [1] Host Controller Reset
 ; [0] Run(1) / Stop (0)
 USBCMD_NAME  db "USB Command : $"
-USBCMD_EX    db 13, 10, "0000h", 13, 10, "$"
+USBCMD_EX    db 13, 10, "          0000", 13, 10, "$"
 
 USBSTS_NAME  db "USB Status :  $"
-USBSTS_EX    db 13, 10, "0000h", 13, 10, "$"
+USBSTS_EX    db 13, 10, "          0000", 13, 10, "$"
 	
 	; Prints information about HC I/O Registers 
 	;
@@ -46,8 +46,13 @@ USBSTS_EX    db 13, 10, "0000h", 13, 10, "$"
 		lea dx, USBCMD_NAME ; String template
 		int 21h             ; Prints template
 
+		; Possible fix for correct addressing
+		push es             ; Extra segment
+		push 00h            ;
+		pop es              ; ES = 0h
+
 		add bx, USBCMD 		; Offset for USBCMD 
-		mov ax, [ebx]       ; Gets USBCMD
+		mov ax, es:[ebx]    ; Gets USBCMD
 		push ax             ;
 
 		call printWordFromStackRM ; Prints USBCMD
@@ -64,7 +69,7 @@ USBSTS_EX    db 13, 10, "0000h", 13, 10, "$"
 		int 21h             ; Prints template
 
 		add bx, USBSTS 		; Offset for USBCMD 
-		mov ax, [ebx]       ; Gets USBCMD
+		mov ax, es:[ebx]    ; Gets USBCMD
 		push ax             ;
 
 		call printWordFromStackRM ; Prints USBCMD
@@ -74,10 +79,12 @@ USBSTS_EX    db 13, 10, "0000h", 13, 10, "$"
 		lea dx, USBSTS_EX   ; String template
 		int 21h             ; Prints template
 		
+		pop es              ; 
 		pop edx             ; Recover registers
 		pop ebx             ;
 		pop eax         	;
 		ret
+	
 	endp
 
 endm
