@@ -142,7 +142,7 @@ displayBARs:
 	in  eax, dx            ; gets data from PCI device
 	cmp ax, 0h             ; valid if nonzero
 	jz nextbar             ; jump to next bar 
-	push eax               ; 
+	
 	mov di,  ax            ; save lower 16 bits
 	shr eax, 16            ; set alone high 16 bits
 	push ax                ; 
@@ -153,7 +153,16 @@ displayBARs:
 	lea dx, newLine        ;
 	int 21h                ;
 	
+
 	pop ebx                ; ebx containes BAR address
+	
+	; Template for saving BARs
+
+	;lea eax, DevBARs       ; Address for BAR Storrage
+	;mov dx, cx             ;
+	;shl dx, 4              ; (4 bytes per BAR)
+	;add ax, dx             ;
+	;mov [eax], ebx         ; Writes BAR address             
 	call printHCinfo       ; Prints Host Contriller registers parameters             
  
    nextbar:	
@@ -177,7 +186,7 @@ nextDevice:
 		
 nextFunction:
 	add ecx, 100h          ; Function step
-	test ecx,800000h       ; First out of Bus digit
+	test ecx, 800000h      ; First out of Bus digit
 	jz search              ; Next function iteration
 
 
@@ -200,6 +209,23 @@ descrip   db ' Class-SubClass-ProgIF = $'
 newLine   db 13, 10, '$'
 bars      db ' BARs (0-5):$'
 space     db '   $'
+
+; =====================================================================================================
+; USB Devices BARs
+
+DevBARs:
+
+	dd ?
+	dd ?
+	dd ?
+	dd ? 
+	dd ?
+	dd ?
+	dd ?
+	dd ?
+	dd ?
+	dd ?
+
 outOfProgram:
 
 	ret
