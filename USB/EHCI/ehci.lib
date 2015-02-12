@@ -1,0 +1,36 @@
+initEHCI macro
+	
+; =====================================================================================================
+; Data  
+
+; Offset for Operational Registers Space
+CAPLENGTH dw 	?
+
+
+; =====================================================================================================
+
+ 	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address
+	printEHCIinfo proc near
+
+		push eax           ; Save eax
+		push ebx           ; Save ebx
+		push edx           ; Save edx
+		push es            ;
+
+		; Data retrieving 
+		push 0h            ; Value for es
+		pop es             ; ES = 0 
+
+		mov bx, 
+
+
+		ret                ;
+
+	endp
+
+
+
+endm
+
