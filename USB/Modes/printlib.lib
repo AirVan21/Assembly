@@ -1,4 +1,4 @@
-initPMprint	macro
+initPrint	macro
 	
 	; Prints string while (charToPrint != '$')
 	;
@@ -25,4 +25,133 @@ initPMprint	macro
 		ret 
 	
 	endp
+
+	; Function, which prints Word(16-bit) from Stack 	
+	; Working in Real Mode only
+
+	printWordFromStackRM proc near
+
+		xor  eax, eax          ; Clear
+		pop  bx                ; Pop ret address
+		pop  ax                ; Pop print value
+		push bx                ; Push ret value
+		push dx                ; Save DX
+		push di                ; Save DI
+		push si                ; Save SI
+		push cx                ; Save CX
+		mov di, ax             ; Storage for value to print
+		mov cx, 4              ; Cycle counter
+		lea bx, hex_table      ; Load in bx char table
+		mov si, 12             ; Shift counter
+
+	cyclePWFSRM:
+		mov ax, di             ; Set default value
+		push cx                ; Save counter
+		mov cx, si             ; Shift value
+		shr ax, cl             ; Shift
+		and ax, 0Fh            ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Result to DL 
+		mov ah, 02h            ; Print char code
+		int 21h                ; 
+		sub si, 4              ;
+		pop cx                 ;
+		loop cyclePWFSRM       ;
+	
+		pop cx                 ; Restore registers
+		pop si                 ;
+		pop di                 ;
+		pop dx                 ;
+		ret                    ;
+
+	endp
+
+	; Function, which prints Word(16-bit) from Stack 	
+	; Working in Protected Mode 
+	; 
+	; ES - screen segment pointer
+	; DI - offset for printing in Video Memory 
+
+	printWordFromStackPM proc near
+
+		xor  eax, eax          ; Clear
+		
+		;pop ax                 ; Word to Print
+		
+		; add di, 2              ;
+		mov ax, 0503h          ;
+		mov es:[di], ax        ;
+	
+	;	pop  bx                ; Pop ret address
+	;	pop  ax                ; Pop print value
+	;	push bx                ; Push ret value
+	;	push di                ; Save DI
+	;	push si                ; Save SI
+	;	push cx                ; Save CX
+
+	;	mov di, ax             ; Storage for value to print
+	;	mov cx, 4              ; Cycle counter
+	;	lea bx, hex_table      ; Load in bx char table
+	;	mov si, 12             ; Shift counter
+
+	;cyclePWFSPM:
+	;	mov ax, di             ; Set default value
+	;	push cx                ; Save counter
+	;	mov cx, si             ; Shift value
+	;	shr ax, cl             ; Shift
+	;	and ax, 0Fh            ; Set digit alone
+	;	xlat                   ; Translate
+					           ; Result in AL 
+		
+	;	mov ah, 05h            ; Style for Video Memory
+	;	mov bx, dx             ; 
+	;	mov es:[bx], ax        ; Mov Char & Style in Video Memory 
+	;	add dx, 2              ; Next char printing 		
+		
+	;	sub si, 4              ;
+	;	pop cx                 ;
+	;	loop cyclePWFSPM       ;
+	
+	;	pop cx                 ; Restore registers
+	;	pop si                 ;
+	;	pop di                 ;
+	
+		ret                    ;
+
+	endp
+
+	; Function, which prints Byte (8-bit) from Stack
+	; Working in Real Mode only
+	; HEX - table is 
+	printByteFromStackRM proc near
+		
+		xor eax, eax           ;
+		pop bx                 ; pop 'ret' address
+		pop ax                 ; pop print value
+		push bx                ; save 'ret; address
+		push dx                ; save 
+		push di                ; save
+		mov di, ax             ; Storage for print value
+		lea bx, hex_table      ; Translation table
+	
+		shr ax, 4              ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Move result to dl
+		mov ah, 02h            ; Print char
+		int 21h                ;
+	
+		mov ax, di             ; Default value
+		and ax, 0Fh            ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Move result to dl
+		mov ah, 02h            ; Print char
+		int 21h                ;
+	
+		pop di                 ; Recover
+		pop dx                 ;
+		ret                    ;
+	
+	endp
+
+
 endm

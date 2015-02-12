@@ -143,7 +143,7 @@ setMainRegister:
 	mov	es, ax           			; Points to prepared screen descriptor 
 
 	mov	ax, DATA_SELECTOR
-	mov	ds,ax			 			; Points to prepared data descriptor 
+	mov	ds, ax			 			; Points to prepared data descriptor 
 
 	mov	ax, STACK_SELECTOR
 	mov	ss, ax           			; Points to prepared stack descriptor  
@@ -159,6 +159,10 @@ printInVMem:
 	mov	di, 480						; Displacement in Video Mem (3rd Row)	
 	mov	ah, 05h						; Print style
 	call printStrPM                 ; Print string in Video Memory
+
+	;mov edx, edi                    ;
+	
+	call printWordFromStackPM       ; Test print with translation
 	
 	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
 
@@ -274,11 +278,6 @@ saveRMregisters:
 ; G = 0, E = 0, W = 1, P = 1
 preBackToRM:
 	
-	; Test output OK!
-	;mov	bx, 0						; DS:BX Points on string to print 
-	;mov	di, 0						; Displacement in Video Mem (3rd Row)
-	;call printStrPM                 ; Print string in Video Memory
-	
 	mov ax, RM_DATA_SELECTOR ; Real Mode Data Selector 
 	; Load similar value
 	mov ss, ax              
@@ -310,6 +309,7 @@ backToRM:
 
 	call enable_interrupts ; Enables interrupts
 	
+
 	int 20h             ; Exit()
 
 	db 0C3h             ; ret
@@ -319,7 +319,7 @@ backToRM:
 ; =====================================================================================================
 ; Extra libs
 
-initPMprint
+initPrint
 
 ; =====================================================================================================
 ; GDT parameters
@@ -362,7 +362,8 @@ GDT_end:
 
 DATA_SEG_START:
 
-db "Hello, world! Protected mode on!$"
+		  db "Hello, world! Protected mode on!$"
+hex_table db "0123456789ABCDEF"
 
 DATA_SEG_END:
 
