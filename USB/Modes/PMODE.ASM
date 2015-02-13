@@ -159,16 +159,14 @@ printInVMem:
 	mov	di, 480						; Displacement in Video Mem (3rd Row)	
 	mov	ah, 05h						; Print style
 	call printStrPM                 ; Print string in Video Memory
-
-	;mov edx, edi                    ;
 	
-	call printWordFromStackPM       ; Test print with translation
-	
-	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
 
 ;loop_dead:                             ; Dead loop
 	
 ;	jmp	loop_dead
+
+	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
+
 
 
 ; Fill correct parameters for GDT register
@@ -362,7 +360,7 @@ GDT_end:
 
 DATA_SEG_START:
 
-		  db "Hello, world! Protected mode on!$"
+greetMsg  db "Hello, world! Protected mode on!$"
 hex_table db "0123456789ABCDEF"
 
 DATA_SEG_END:

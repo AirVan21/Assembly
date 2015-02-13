@@ -1,5 +1,6 @@
 initPrint	macro
 	
+
 	; Prints string while (charToPrint != '$')
 	;
 	; DS - data segment   pointer
@@ -71,50 +72,57 @@ initPrint	macro
 	; 
 	; ES - screen segment pointer
 	; DI - offset for printing in Video Memory 
-
+	; 
+	; AX, BX are changed
+	; DI changed (correct offset for print should be saved)
 	printWordFromStackPM proc near
 
-		xor  eax, eax          ; Clear
+		pop bx                 ; ret address
+		pop ax                 ; Word to Print
 		
-		;pop ax                 ; Word to Print
+		push bx                ; Push ret address
+		push ecx               ; Save ecx
 		
-		; add di, 2              ;
-		mov ax, 0503h          ;
+		add di, 2              ; Move right on 1 symbol 
+		
+		mov cx, ax             ; CX - saver for original number
+		lea bx, hex_table      ; Loads hex table for translation
+		sub bx, offset greetMsg; Points to hex_table start (in PM)
+
+		; First digit
+		shr ax, 12             ; Set alone digit
+		xlat                   ; Translates
+		mov ah, 05h            ; Style for Video Memory
 		mov es:[di], ax        ;
-	
-	;	pop  bx                ; Pop ret address
-	;	pop  ax                ; Pop print value
-	;	push bx                ; Push ret value
-	;	push di                ; Save DI
-	;	push si                ; Save SI
-	;	push cx                ; Save CX
-
-	;	mov di, ax             ; Storage for value to print
-	;	mov cx, 4              ; Cycle counter
-	;	lea bx, hex_table      ; Load in bx char table
-	;	mov si, 12             ; Shift counter
-
-	;cyclePWFSPM:
-	;	mov ax, di             ; Set default value
-	;	push cx                ; Save counter
-	;	mov cx, si             ; Shift value
-	;	shr ax, cl             ; Shift
-	;	and ax, 0Fh            ; Set digit alone
-	;	xlat                   ; Translate
-					           ; Result in AL 
+		add di, 2              ; Points to the next place
 		
-	;	mov ah, 05h            ; Style for Video Memory
-	;	mov bx, dx             ; 
-	;	mov es:[bx], ax        ; Mov Char & Style in Video Memory 
-	;	add dx, 2              ; Next char printing 		
+		; Second digit
+		mov ax, cx             ; 
+		shr ax, 8              ;
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
 		
-	;	sub si, 4              ;
-	;	pop cx                 ;
-	;	loop cyclePWFSPM       ;
-	
-	;	pop cx                 ; Restore registers
-	;	pop si                 ;
-	;	pop di                 ;
+		; Third digit
+		mov ax, cx             ; 
+		shr ax, 4              ;
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		; Fourth digit
+		mov ax, cx             ; 
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		pop ecx                ;
 	
 		ret                    ;
 
