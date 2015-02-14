@@ -25,8 +25,9 @@ CODE_SELECTOR    = 8          ; Code
 STACK_SELECTOR   = 16         ; Stack 
 DATA_SELECTOR    = 24         ; Data 
 SCREEN_SELECTOR  = 32         ; Data
-RM_CODE_SELECTOR = 40         ; Real Mode Code
-RM_DATA_SELECTOR = 48         ; Real Mode Data
+MEMORY_SELECTOR  = 40         ; Data
+RM_CODE_SELECTOR = 48         ; Real Mode Code
+RM_DATA_SELECTOR = 56         ; Real Mode Data
 
 ; ACCESS RIGHTS 
 CODE_ACCESS_R    = 10011000b  ; P ; DPL ; S ; Type ; A ;
@@ -101,6 +102,12 @@ set_prot_mode:
 	
 	call setDescriptor              ;
 
+	; Memory (Zero) Descriptor
+	xor eax, eax                    ; Zero Address
+	mov edx, 0FFFFFFFFh             ; 
+	mov cl, DATA_ACCESS_R           ; Access Rights For Zero Point Addressing  
+	
+	call setDescriptor              ; Setting descriptor 
 	
 	call setParamGDT           		; Calculate GDT address, size
 	
@@ -109,7 +116,7 @@ set_prot_mode:
 	push cs                         ; Code Segment
 	pop ax                          ; AX = CS 
 	shl eax, 4                      ;
-	mov edx, 0ffffh                 ; Limit 64K 
+	mov edx, 0FFFFh                 ; Limit 64K 
 	mov cl, RM_CODE_ACCESS_R        ; 
 
 	call setDescriptor              ;
@@ -150,6 +157,9 @@ setMainRegister:
 	mov	ss, ax           			; Points to prepared stack descriptor  
 	mov	sp, 0
 	
+	mov ax, MEMORY_SELECTOR         ; Points to prepared zero-mem descriptor
+	mov fs, ax                      ;
+
 	jmp printInVMem      
 
 ; Prints string to Video Memory
@@ -161,7 +171,7 @@ printInVMem:
 	mov	ah, 05h						; Print style
 	call printStrPM                 ; Print string in Video Memory
 	
-	;call printEHCIinfo              ; Prints info about EHCI 
+	call printEHCIinfo              ; Prints info about EHCI 
 
 loop_dead:                          ; Dead loop
 	
@@ -215,12 +225,14 @@ setDescriptor:
 	shl ecx, 24                    ; Kill ecx byte
 	mov cl, al                     ; To cl bit (16-23) from Address  (Part 2)
 
+	shr edx, 16                    ; Oldest Limit Part 
+	and dx, 0Fh                    ; Set only last 4-bits
 	pop ax                         ; Get Acess right 
 	mov ch, al                     ; Acess to 2-nd ecx byte
                                    ; Oldest Limit part is zero
                                    ; G D X U      part is zero
     mov [bx + 4], ecx              ; Writing descriptors second part
-    
+    mov [bx + 6], dl               ; Write Oldest Part
     add bx, 8                      ; Add 8 bytes to access next descriptor 
 	
 	pop ecx                        ; Recover ecx
@@ -340,6 +352,7 @@ GDT:
 ; STACK_DESCRIPTOR
 ; DATA_DESCRIPTOR
 ; SCREEN_DESCRIPTOR
+; MEMORY_DESCRIPTOR
 ; |    Part 1     |                              |      ACCESS RIGHTS     |Part 2|        | 
 ; [Address(31-24) ; G ; D ; X ; U ; Limit(19-16) ; P ; DPL ; S ; Type ; A ; Address(23-0) ; Limit(15-0)]
 ; 63           56  55  54  53  52   51        48  47  46 45 44   43 41 40   39         16   15        0
@@ -352,6 +365,7 @@ GDT:
 	dd 	?, ?
 	dd 	?, ?
 	dd 	?, ?
+	dd  ?, ?
 	
 	; Descriptors for Real Mode
 	dd 	?, ?
