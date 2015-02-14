@@ -1,0 +1,53 @@
+initEHCI macro
+	
+; =====================================================================================================
+; Data  
+
+; Offset for Operational Registers Space
+CAPLENGTH1 dw 	?
+
+; Temporary BAR information
+BAR1 = 0C360A000h
+BAR2 = 0C3609000h
+BAR3 = 0h 
+BAR4 = 0h 
+
+
+; =====================================================================================================
+
+ 	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address
+	; EDI - contains Video Mem offset (where to print)
+	printEHCIinfo proc near
+
+		push eax           ; Save eax
+		push ebx           ; Save ebx
+		push edx           ; Save edx
+		push edi           ; Save edi
+
+		; Data retrieving 
+		push 0h            ; Value for es
+		pop es             ; ES = 0 
+
+		mov ebx, 0C360A000h; Gets BAR1		
+		mov ax, [ebx]      ;   
+		;mov CAPLENGTH1, ax ; Writes CAPLENGTH1
+
+						   ; Prints CAPLENGTH1
+		mov di, 640        ; 4-th Row
+		push SCREEN_SELECTOR; 
+		pop es             ; Recover Screen Selector 
+						   ; Prints CAPLENGTH1
+		
+		push ax            ; CAPLENGTH1
+		call printWordFromStackPM 
+
+		pop edi            ; Recover registers
+		pop edx            ;
+		pop ebx            ;
+		pop eax            ; 
+		ret                ;
+
+	endp
+endm

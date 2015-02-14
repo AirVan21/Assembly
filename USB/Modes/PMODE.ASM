@@ -1,4 +1,5 @@
 	include printlib.lib
+	include ehci.lib
 	.386p
 	pmode segment use16
 	assume	cs:pmode, ds:pmode, es:pmode
@@ -156,14 +157,15 @@ printInVMem:
 	
 	xor edi, edi	
 	mov	bx, 0						; DS:BX Points on string to print 
-	mov	di, 480						; Displacement in Video Mem (3rd Row)	
+	mov	di, 320						; Displacement in Video Mem (3rd Row)	
 	mov	ah, 05h						; Print style
 	call printStrPM                 ; Print string in Video Memory
 	
+	;call printEHCIinfo              ; Prints info about EHCI 
 
-;loop_dead:                             ; Dead loop
+loop_dead:                          ; Dead loop
 	
-;	jmp	loop_dead
+	jmp	loop_dead
 
 	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
 
@@ -318,6 +320,8 @@ backToRM:
 ; Extra libs
 
 initPrint
+
+initEHCI
 
 ; =====================================================================================================
 ; GDT parameters

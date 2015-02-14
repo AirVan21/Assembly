@@ -83,8 +83,6 @@ initPrint	macro
 		push bx                ; Push ret address
 		push ecx               ; Save ecx
 		
-		add di, 2              ; Move right on 1 symbol 
-		
 		mov cx, ax             ; CX - saver for original number
 		lea bx, hex_table      ; Loads hex table for translation
 		sub bx, offset greetMsg; Points to hex_table start (in PM)
