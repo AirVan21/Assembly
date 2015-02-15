@@ -21,6 +21,25 @@ BAR4 = 0h
 		push ebx           		; Save ebx
 		push edi           		; 
 		
+		; Show HC Base Address
+		;lea bx, HCGreet  		; Address for CapLenMsg
+		;sub bx, offset GreetMsg ; Start of DS
+		;call printStrPm    		; Print CapLenMsg
+		;mov ebx, BAR1      		; Gets BAR1	
+								; Print Base Address
+		;shr ebx, 16             ;
+		;push bx					;
+		;call printWordFromStackPM
+		;mov ebx, BAR1           ;
+		;push bx                 ;
+		;call printWordFromStackPM		
+
+		
+		;pop edi           		; Recover Print Point
+		;add edi, ROWLENGTH 		; Next Row
+		;push edi                ; Save updated edi 
+		
+
 		; Work with CAPLENGTH
 		lea bx, CapLenMsg  		; Address for CapLenMsg
 		sub bx, offset GreetMsg ; Start of DS
@@ -29,8 +48,8 @@ BAR4 = 0h
 		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
 
 		pop edi           		; Recover Print Point
-		push edi                ; Save original edi 
 		add edi, ROWLENGTH 		; Next Row
+		push edi                ; Save updated edi 
 		
 		; Work with HCIVERSION 
 		lea bx, HCVersion  		; Address for CapLenMsg
@@ -38,6 +57,17 @@ BAR4 = 0h
 		call printStrPm    		; Print CapLenMsg
 		mov ebx, BAR1      		; Gets BAR1	
 		call retrieveHCIVERSION ; Write CAPLENGTH for BAR1
+		
+		pop edi           		; Recover Print Point
+		push edi                ; Save original edi 
+		add edi, ROWLENGTH 		; Next Row
+		
+		; Work with HCSPARAMS 
+		lea bx, N_PORTS  		; Address for CapLenMsg
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print CapLenMsg
+		mov ebx, BAR1      		; Gets BAR1	
+		call retrieveHCSPARAMS  ; Write CAPLENGTH for BAR1
 		
 		pop edi                 ; Recover edi
 		pop ebx            		; Recover ebx 
@@ -64,7 +94,7 @@ BAR4 = 0h
 		ret
 	endp
 
-	; Retieves and prints CAPLENGTH
+	; Retieves and prints EHCI Revision number 
 	;
 	; EBX - contains Base Address (BAR)
 	retrieveHCIVERSION proc near
@@ -75,6 +105,28 @@ BAR4 = 0h
 		add ebx, 2         		; Offset for HCIVersion 
 		mov ax, fs:[ebx]   		;   
 						   		; Prints CAPLENGTH
+		push ax            		; CAPLENGTH1
+		call printWordFromStackPM
+		
+		pop ebx          
+		pop ax             		; Recover registers
+ 		
+		ret
+	endp
+
+	; Retieves and prints EHCI HCSPARAMS register 
+	; (In this case Number of ports for current HC)
+	;
+	; EBX - contains Base Address (BAR)
+	retrieveHCSPARAMS proc near
+		
+		push ax			   	    ; Save ax
+		push ebx           		; Save ebx 
+		
+		add ebx, 4         		; Offset for HCSPARAMS 
+		mov eax, dword ptr fs:[ebx]  ;   
+						   		; Prints CAPLENGTH
+		and ax, 0Fh             ; Only last 4 bits are needed
 		push ax            		; CAPLENGTH1
 		call printWordFromStackPM
 		
