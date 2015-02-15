@@ -1,11 +1,6 @@
 initEHCI macro
 	
 ; =====================================================================================================
-; Data  
-
-; Offset for Operational Registers Space
-CAPLENGTH1 dw 	?
-
 ; Temporary BAR information
 BAR1 = 0C360A000h
 BAR2 = 0C3609000h
@@ -18,29 +13,75 @@ BAR4 = 0h
  	; Prints information about HC I/O Registers 
 	;
 	; EBX - contains BAR address
-	; EDI - contains Video Mem offset (where to print)
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
 	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
 	printEHCIinfo proc near
 
-		push eax           ; Save eax
-		push ebx           ; Save ebx
-		push edi           ; Save edi
-
-		;mov ebx, BAR1      ; Gets BAR1		
-		;mov ax, fs:[ebx]   ;   
-		;mov CAPLENGTH1, ax ; Writes CAPLENGTH1
-
-						   ; Prints CAPLENGTH1
-		mov di, 640        ; 4-th Row
-						   ; Prints CAPLENGTH1
+		push ebx           		; Save ebx
+		push edi           		; 
 		
-		push ax            ; CAPLENGTH1
-		call printWordFromStackPM 
+		; Work with CAPLENGTH
+		lea bx, CapLenMsg  		; Address for CapLenMsg
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print CapLenMsg
+		mov ebx, BAR1      		; Gets BAR1	
+		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
 
-		pop edi            ; Recover registers
-		pop ebx            ;
-		pop eax            ; 
-		ret                ;
+		pop edi           		; Recover Print Point
+		push edi                ; Save original edi 
+		add edi, ROWLENGTH 		; Next Row
+		
+		; Work with HCIVERSION 
+		lea bx, HCVersion  		; Address for CapLenMsg
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print CapLenMsg
+		mov ebx, BAR1      		; Gets BAR1	
+		call retrieveHCIVERSION ; Write CAPLENGTH for BAR1
+		
+		pop edi                 ; Recover edi
+		pop ebx            		; Recover ebx 
+		
+		ret                		;
 
 	endp
+
+	; Retieves and prints CAPLENGTH
+	;
+	; EBX - contains Base Address (BAR)
+	retrieveCAPLENGTH proc near
+
+		push ax			   		; Save ax
+		
+		mov al, fs:[ebx]   		;   
+		;mov CAPLENGTH, al  		; Writes a CAPLENGTH
+						   		; Prints CAPLENGTH
+		push ax            		; CAPLENGTH1
+		call printWordFromStackPM
+		
+		pop ax  
+ 
+		ret
+	endp
+
+	; Retieves and prints CAPLENGTH
+	;
+	; EBX - contains Base Address (BAR)
+	retrieveHCIVERSION proc near
+		
+		push ax			   	    ; Save ax
+		push ebx           		; Save ebx 
+		
+		add ebx, 2         		; Offset for HCIVersion 
+		mov ax, fs:[ebx]   		;   
+						   		; Prints CAPLENGTH
+		push ax            		; CAPLENGTH1
+		call printWordFromStackPM
+		
+		pop ebx          
+		pop ax             		; Recover registers
+ 		
+		ret
+	endp
+
 endm

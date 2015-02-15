@@ -10,6 +10,10 @@ initPrint	macro
 	; AH - print style
 	printStrPM proc near
 
+		push ax             ; Save AX
+		
+		mov	ah, 05h			; Print style
+	
 	putChar:
 
 		mov al, [bx]		; Get char to print
@@ -23,6 +27,8 @@ initPrint	macro
 	
 	outPutChar:
 		
+		pop ax              ; Recover AX
+
 		ret 
 	
 	endp

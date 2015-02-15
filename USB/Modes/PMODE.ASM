@@ -13,6 +13,7 @@ _:
 	jmp start  				  ;  Marker to place, where program starts	
 
 ; INT CONSTS
+ROWLENGTh      = 80 * 2       ; 80 Symbols x (1 Byte for Char + 1 Byte for Style)
 CMOS_PORT_ID   = 70h          ; Port for CMOS memory access	
 
 VIDEO_BASE     = 0B8000h      ; Video memory for color monitors
@@ -69,6 +70,7 @@ set_prot_mode:
 	push cs                         ; For Code Segment Address
 	pop ax                          ; 
 	shl eax, 4                      ; Code Segment Address
+	;add bx, 8                       ; 
 	mov dx, CODE_LIMIT              ; Simple segment limit
 	mov cl, CODE_ACCESS_R           ; Code access rights
 	
@@ -103,12 +105,10 @@ set_prot_mode:
 	call setDescriptor              ;
 
 	; Memory (Zero) Descriptor
-	xor eax, eax                    ; Zero Address
-	mov edx, 0FFFFFFFFh             ; 
-	mov cl, DATA_ACCESS_R           ; Access Rights For Zero Point Addressing  
+				                     ; Zero Address Descriptor is hardcoded 
+	add bx, 8                        ; Moves to the next descriptor
 	
-	call setDescriptor              ; Setting descriptor 
-	
+
 	call setParamGDT           		; Calculate GDT address, size
 	
 	; Sets extra RM Code Descriptor
@@ -167,10 +167,10 @@ printInVMem:
 	
 	xor edi, edi	
 	mov	bx, 0						; DS:BX Points on string to print 
-	mov	di, 320						; Displacement in Video Mem (3rd Row)	
-	mov	ah, 05h						; Print style
+	mov	di, 160						; Displacement in Video Mem (3rd Row)	
 	call printStrPM                 ; Print string in Video Memory
 	
+	mov edi, 320                    ; 3rd Row
 	call printEHCIinfo              ; Prints info about EHCI 
 
 loop_dead:                          ; Dead loop
@@ -321,7 +321,6 @@ backToRM:
 
 	call enable_interrupts ; Enables interrupts
 	
-
 	int 20h             ; Exit()
 
 	db 0C3h             ; ret
@@ -361,11 +360,11 @@ GDT:
 
 	; Descriptors for Protected Mode
 	dd 	?, ?  
-	dd 	?, ?	
-	dd 	?, ?
-	dd 	?, ?
-	dd 	?, ?
 	dd  ?, ?
+	dd 	?, ?
+	dd 	?, ?
+	dd 	?, ?
+	db  0FFh, 0FFh, 00h, 00h, 00h, 10010010b, 11001111b, 00h	; Descriptor for Zero Memory Point 
 	
 	; Descriptors for Real Mode
 	dd 	?, ?
@@ -377,9 +376,15 @@ GDT_end:
 ; PM Data Part
 
 DATA_SEG_START:
-
-greetMsg  db "Hello, world! Protected mode on!$"
+; STRING CONSTS 
+GreetMsg  db "Hello, world! Protected mode on!$"
 hex_table db "0123456789ABCDEF"
+CapLenMsg db "CAPLENGTH = $"
+HCVersion db "HCVERSION = $"
+; INT CONSTS
+CAPLENGTH db  ?
+
+;  
 
 DATA_SEG_END:
 
@@ -399,8 +404,6 @@ RMODE_DS dw 	?
 RMODE_ES dw 	?
 RMODE_GS dw 	?
 RMODE_FS dw 	?
-
-RMmsg db 13, 10, "Back in real mode!", 13, 10, "$"
 
 	main endp
 	pmode ends
