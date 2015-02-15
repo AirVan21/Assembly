@@ -380,7 +380,9 @@ DATA_SEG_START:
 GreetMsg  db "Hello, world! Protected mode on!$"
 hex_table db "0123456789ABCDEF"
 CapLenMsg db "CAPLENGTH = $"
-HCVersion db "HCVERSION = $"
+HCVersion db "EHCI Revision = $"
+N_PORTS   db "Number of Ports on HC = $"
+HCGreet   db "Host Controller = $"
 ; INT CONSTS
 CAPLENGTH db  ?
 
