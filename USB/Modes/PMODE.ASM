@@ -21,6 +21,10 @@ CODE_LIMIT     = 1024         ;
 STACK_LIMIT    = 1024         ; 
 GDT_SIZE       = (GDT_end - GDT) - 1
 
+; Operational registers
+USBCMDoffset   = 00h
+USBSTSoffset   = 04h
+
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
 STACK_SELECTOR   = 16         ; Stack 
@@ -165,12 +169,11 @@ setMainRegister:
 ; Prints string to Video Memory
 printInVMem:
 	
-	xor edi, edi	
-	mov	bx, 0						; DS:BX Points on string to print 
-	mov	di, 160						; Displacement in Video Mem (3rd Row)	
-	call printStrPM                 ; Print string in Video Memory
+	;mov	bx, 0						; DS:BX Points on string to print 
+	;mov	di, 160						; Displacement in Video Mem (3rd Row)	
+	;call printStrPM                 ; Print string in Video Memory
 	
-	mov edi, 320                    ; 3rd Row
+	mov edi, 160                    ; 3rd Row
 	call printEHCIinfo              ; Prints info about EHCI 
 
 loop_dead:                          ; Dead loop
@@ -377,16 +380,18 @@ GDT_end:
 
 DATA_SEG_START:
 ; STRING CONSTS 
-GreetMsg  db "Hello, world! Protected mode on!$"
+GreetMsg  db "Protected mode on!$"
 hex_table db "0123456789ABCDEF"
-CapLenMsg db "CAPLENGTH = $"
-HCVersion db "EHCI Revision = $"
-N_PORTS   db "Number of Ports on HC = $"
-HCGreet   db "Host Controller = $"
-; INT CONSTS
-CAPLENGTH db  ?
+CapLenMsg db "CAPLENGTH Register = $"
+HCVersion db "EHCI Revision      = $"
+N_PORTS   db "Number of HC Ports = $"
+HCGreet   db "Host Controller    = $"
+USBCMD    db "USBCMD Register    = $"
+USBSTS    db "USBSTS Register    = $"
 
-;  
+; INT CONSTS
+CAPLENGTH dw  20h
+  
 
 DATA_SEG_END:
 

@@ -22,23 +22,20 @@ BAR4 = 0h
 		push edi           		; 
 		
 		; Show HC Base Address
-		;lea bx, HCGreet  		; Address for CapLenMsg
-		;sub bx, offset GreetMsg ; Start of DS
-		;call printStrPm    		; Print CapLenMsg
-		;mov ebx, BAR1      		; Gets BAR1	
-								; Print Base Address
-		;shr ebx, 16             ;
-		;push bx					;
-		;call printWordFromStackPM
-		;mov ebx, BAR1           ;
-		;push bx                 ;
-		;call printWordFromStackPM		
+		lea bx, HCGreet  		; Address HC string
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print HC string
+		mov ebx, BAR1      		; Gets BAR1	
+		
+		push bx 				; Saves Low Part
+		shr ebx, 16             ; Gets Significant Part
+		push bx					; Prints Base Address
+		call printWordFromStackPM
+		call printWordFromStackPM		
 
-		
-		;pop edi           		; Recover Print Point
-		;add edi, ROWLENGTH 		; Next Row
-		;push edi                ; Save updated edi 
-		
+		pop edi           		; Recover Print Point
+		add edi, ROWLENGTH 		; Next Row
+		push edi                ; Save updated edi 
 
 		; Work with CAPLENGTH
 		lea bx, CapLenMsg  		; Address for CapLenMsg
@@ -52,22 +49,34 @@ BAR4 = 0h
 		push edi                ; Save updated edi 
 		
 		; Work with HCIVERSION 
-		lea bx, HCVersion  		; Address for CapLenMsg
+		lea bx, HCVersion  		; Address for HCVersion
 		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print CapLenMsg
+		call printStrPm    		; Print HCVersion
 		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCIVERSION ; Write CAPLENGTH for BAR1
+		call retrieveHCIVERSION ; Write HCVersion for BAR1
 		
 		pop edi           		; Recover Print Point
-		push edi                ; Save original edi 
 		add edi, ROWLENGTH 		; Next Row
+		push edi                ; Save updated edi 
 		
 		; Work with HCSPARAMS 
-		lea bx, N_PORTS  		; Address for CapLenMsg
+		lea bx, N_PORTS  		; Address for N_PORTS
 		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print CapLenMsg
+		call printStrPm    		; Print N_PORTS
 		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCSPARAMS  ; Write CAPLENGTH for BAR1
+		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
+		
+		pop edi           		; Recover Print Point
+		add edi, ROWLENGTH 		; Next Row
+		push edi                ; Save original edi 
+		
+		; Work with USBCMD
+		lea bx, USBCMD  		; Address for USBCMD
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print USBCMD
+		mov eax, USBCMDoffset   ; 
+		mov ebx, BAR1      		; Gets BAR1	
+		call retrieveOperRegister; Write USBCMD for BAR1
 		
 		pop edi                 ; Recover edi
 		pop ebx            		; Recover ebx 
@@ -83,8 +92,10 @@ BAR4 = 0h
 
 		push ax			   		; Save ax
 		
+		xor ax, ax              ;
+
 		mov al, fs:[ebx]   		;   
-		;mov CAPLENGTH, al  		; Writes a CAPLENGTH
+		;mov CAPLENGTH, ax  		; Writes a CAPLENGTH
 						   		; Prints CAPLENGTH
 		push ax            		; CAPLENGTH1
 		call printWordFromStackPM
@@ -135,5 +146,40 @@ BAR4 = 0h
  		
 		ret
 	endp
+
+	; Retieves and prints Operational register (USBCMD, USBSTS) 
+	; 
+	; EAX - contains offset for certain Register
+	; EBX - contains Base Address (BAR)
+	retrieveOperRegister proc near
+		
+		push eax			   	; Save eax
+		push ebx           		; Save ebx 
+		push ecx                ;
+		push dx                 ;
+
+		xor edx, edx            ; 
+		xor ecx, ecx            ;
+
+		mov cx, offset USBCMD   ;
+		sub cx, offset GreetMsg ;
+		mov dx, [ecx]           ;
+		add bx, cx         	    ;  
+		mov eax, dword ptr fs:[ebx]   	 
+						   		;  
+		push ax            		; Prints dword 
+		shr eax, 16             ; 
+		push ax                 ; 
+		call printWordFromStackPM
+		call printWordFromStackPM
+		
+		pop dx                  ; Recover registers
+		pop ecx                 ; 
+		pop ebx                 ;
+		pop eax             	;
+ 		
+		ret
+	endp
+
 
 endm
