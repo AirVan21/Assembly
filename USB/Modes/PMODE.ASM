@@ -169,12 +169,17 @@ setMainRegister:
 ; Prints string to Video Memory
 printInVMem:
 	
-	;mov	bx, 0						; DS:BX Points on string to print 
-	;mov	di, 160						; Displacement in Video Mem (3rd Row)	
-	;call printStrPM                 ; Print string in Video Memory
 	
-	mov edi, 160                    ; 3rd Row
-	call printEHCIinfo              ; Prints info about EHCI 
+	mov edi, 160                    ; 2nd Row
+	call printEHCICapInfo           ; Prints info about EHCI Capacity Registers 
+
+	mov	bx, 0						; DS:BX Points on string to print 
+	mov	di, 960						; Displacement in Video Mem (3rd Row)	
+	call printStrPM                 ; Print string in Video Memory
+
+	mov di, 1120                    ; 6-th Row
+	;call printEHCIOperInfo          ; Prints info about EHCI Operational Registers
+
 
 loop_dead:                          ; Dead loop
 	
@@ -386,11 +391,11 @@ CapLenMsg db "CAPLENGTH Register = $"
 HCVersion db "EHCI Revision      = $"
 N_PORTS   db "Number of HC Ports = $"
 HCGreet   db "Host Controller    = $"
-USBCMD    db "USBCMD Register    = $"
-USBSTS    db "USBSTS Register    = $"
+USBCMDmsg db "USBCMD Register    = $"
+USBSTSmsg db "USBSTS Register    = $"
 
 ; INT CONSTS
-CAPLENGTH dw  20h
+CAPLENGTH dw  020h
   
 
 DATA_SEG_END:

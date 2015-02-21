@@ -10,16 +10,17 @@ BAR4 = 0h
 
 ; =====================================================================================================
 
- 	; Prints information about HC I/O Registers 
+ 	; Prints information about HC Capacity I/O Registers 
 	;
 	; EBX - contains BAR address
 	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
 	; FS  - contains Selector For Zero Memory
 	; ES  - contains Video Memory Selector
-	printEHCIinfo proc near
+	printEHCICapInfo proc near
 
 		push ebx           		; Save ebx
 		push edi           		; 
+		;------------------------
 		
 		; Show HC Base Address
 		lea bx, HCGreet  		; Address HC string
@@ -66,22 +67,12 @@ BAR4 = 0h
 		mov ebx, BAR1      		; Gets BAR1	
 		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
 		
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save original edi 
-		
-		; Work with USBCMD
-		lea bx, USBCMD  		; Address for USBCMD
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print USBCMD
-		mov eax, USBCMDoffset   ; 
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveOperRegister; Write USBCMD for BAR1
-		
+        ;-----------------------
+		; Out
 		pop edi                 ; Recover edi
 		pop ebx            		; Recover ebx 
 		
-		ret                		;
+		db 0C3h                 ; ret
 
 	endp
 
@@ -95,7 +86,6 @@ BAR4 = 0h
 		xor ax, ax              ;
 
 		mov al, fs:[ebx]   		;   
-		;mov CAPLENGTH, ax  		; Writes a CAPLENGTH
 						   		; Prints CAPLENGTH
 		push ax            		; CAPLENGTH1
 		call printWordFromStackPM
@@ -136,9 +126,9 @@ BAR4 = 0h
 		
 		add ebx, 4         		; Offset for HCSPARAMS 
 		mov eax, dword ptr fs:[ebx]  ;   
-						   		; Prints CAPLENGTH
+						   		; Prints Num Of Ports 
 		and ax, 0Fh             ; Only last 4 bits are needed
-		push ax            		; CAPLENGTH1
+		push ax            		; 
 		call printWordFromStackPM
 		
 		pop ebx          
@@ -146,6 +136,34 @@ BAR4 = 0h
  		
 		ret
 	endp
+
+
+ 	; Prints information about HC Operational I/O Registers 
+	;
+	; EBX - contains BAR address
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
+	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
+	printEHCIOperInfo proc near
+
+		push ebx           		 ; Save ebx
+		;push edi           		 ; 
+		;------------------------
+		
+		;lea bx, CapLenMsg        ; USBCMD string
+		;sub bx, offset GreetMsg  ; Offset for DS
+		;call printStrPM          ; Prints string
+		
+		;-----------------------
+		; Out
+		;pop edi                  ; Recover edi
+		pop ebx            		 ; Recover ebx 
+		
+		db 0C3h                  ; Ret
+
+
+	endp
+
 
 	; Retieves and prints Operational register (USBCMD, USBSTS) 
 	; 
@@ -161,8 +179,6 @@ BAR4 = 0h
 		xor edx, edx            ; 
 		xor ecx, ecx            ;
 
-		mov cx, offset USBCMD   ;
-		sub cx, offset GreetMsg ;
 		mov dx, [ecx]           ;
 		add bx, cx         	    ;  
 		mov eax, dword ptr fs:[ebx]   	 

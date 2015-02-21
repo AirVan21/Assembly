@@ -7,7 +7,6 @@ initPrint	macro
 	; ES - screen segment pointer
 	; BX - offset in printing string
 	; DI - offset for printing string in Video Mem
-	; AH - print style
 	printStrPM proc near
 
 		push ax             ; Save AX
@@ -29,7 +28,7 @@ initPrint	macro
 		
 		pop ax              ; Recover AX
 
-		ret 
+		db 0C3h             ; ret
 	
 	endp
 
