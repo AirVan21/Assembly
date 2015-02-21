@@ -27,8 +27,7 @@ initPrint	macro
 	outPutChar:
 		
 		pop ax              ; Recover AX
-
-		db 0C3h             ; ret
+		ret                 ;
 	
 	endp
 

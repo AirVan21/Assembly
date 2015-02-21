@@ -173,11 +173,7 @@ printInVMem:
 	mov edi, 160                    ; 2nd Row
 	call printEHCICapInfo           ; Prints info about EHCI Capacity Registers 
 
-	mov	bx, 0						; DS:BX Points on string to print 
-	mov	di, 960						; Displacement in Video Mem (3rd Row)	
-	call printStrPM                 ; Print string in Video Memory
-
-	mov di, 1120                    ; 6-th Row
+	;mov edi, 960                    ;
 	;call printEHCIOperInfo          ; Prints info about EHCI Operational Registers
 
 
@@ -403,7 +399,9 @@ DATA_SEG_END:
 ; ======================================================================================================
 ; PM Stack Part
 
+
 	db 1024 DUP (0)	; Memory which reserved for stack
+
 
 STACK_SEG_START:	; Mark for stack
 

@@ -2,10 +2,9 @@ initEHCI macro
 	
 ; =====================================================================================================
 ; Temporary BAR information
+
 BAR1 = 0C360A000h
 BAR2 = 0C3609000h
-BAR3 = 0h 
-BAR4 = 0h 
 
 
 ; =====================================================================================================
@@ -147,7 +146,7 @@ BAR4 = 0h
 	printEHCIOperInfo proc near
 
 		push ebx           		 ; Save ebx
-		;push edi           		 ; 
+		push edi           		 ; 
 		;------------------------
 		
 		;lea bx, CapLenMsg        ; USBCMD string
@@ -156,11 +155,10 @@ BAR4 = 0h
 		
 		;-----------------------
 		; Out
-		;pop edi                  ; Recover edi
+		pop edi                  ; Recover edi
 		pop ebx            		 ; Recover ebx 
 		
-		db 0C3h                  ; Ret
-
+		ret                      ;
 
 	endp
 
