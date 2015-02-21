@@ -1,0 +1,76 @@
+initOperationalInfo macro
+
+ 	; Prints information about HC Operational I/O Registers 
+	;
+	; EBX - contains BAR address
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
+	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
+	printEHCIOperInfo proc near 
+
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edi                 ; 
+		;------------------------
+		
+		lea bx, USBCMDmsg       ; Address for Message
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print 
+
+		mov ebx, BAR1           ; 
+		mov eax, USBCMDoffset   ; USBCMD 
+
+		call retrieveOperRegister
+
+		pop edi                 ; Next Row 
+		add edi, ROWLENGTH      ; 
+		push edi                ; 
+		
+		lea bx, USBSTSmsg       ; Address for Message
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print 
+
+		mov ebx, BAR1           ; 
+		mov eax, USBSTSoffset   ; USBSTS 
+
+		call retrieveOperRegister
+
+		;------------------------
+		; Out
+		pop edi 
+		pop eax                  ; Recover edi
+		pop ebx            		 ; Recover ebx 
+
+		ret 
+
+	endp
+
+
+	; Retieves and prints Operational register (USBCMD, USBSTS) 
+	; 
+	; EAX - contains offset for certain Register
+	; EBX - contains Base Address (BAR)
+	retrieveOperRegister proc near
+		
+		push ebx           		; Save ebx 
+		push eax			   	; Save eax
+		
+		add ebx, eax            ; 
+		add ebx, 020h           ; Offset for Operational registers
+
+		mov eax, fs:[ebx]       ; Getting USBCMD
+
+		push ax                 ; Print USBCMD
+		shr eax, 16             ;
+		push ax                 ;
+		call printWordFromStackPM
+		call printWordFromStackPM
+		
+		pop eax             	;
+		pop ebx                 ;
+		
+		ret
+	
+	endp
+
+endm

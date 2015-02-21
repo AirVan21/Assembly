@@ -9,6 +9,28 @@ BAR2 = 0C3609000h
 
 ; =====================================================================================================
 
+ 	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address | Or Not 
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
+	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
+	printEHCIInfo proc near
+
+		call printEHCIOperInfo	         ; Operational Registers information	
+		
+		mov edi, 1120                    ; New place to print  
+		
+		; call printEHCICapInfo            ; Capacity Registers information
+  		
+ 	dead_loop:
+
+		jmp dead_loop                    ; Stopping 
+
+	endp
+
+
+
  	; Prints information about HC Capacity I/O Registers 
 	;
 	; EBX - contains BAR address
@@ -66,15 +88,14 @@ BAR2 = 0C3609000h
 		mov ebx, BAR1      		; Gets BAR1	
 		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
 		
-        ;-----------------------
-		; Out
-		pop edi                 ; Recover edi
-		pop ebx            		; Recover ebx 
-		
-		db 0C3h                 ; ret
+        pop edi                 ;
+        pop ebx                 ;
+        
+        ret
 
-	endp
+    endp
 
+	
 	; Retieves and prints CAPLENGTH
 	;
 	; EBX - contains Base Address (BAR)
@@ -134,66 +155,7 @@ BAR2 = 0C3609000h
 		pop ax             		; Recover registers
  		
 		ret
+	
 	endp
-
-
- 	; Prints information about HC Operational I/O Registers 
-	;
-	; EBX - contains BAR address
-	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
-	; FS  - contains Selector For Zero Memory
-	; ES  - contains Video Memory Selector
-	printEHCIOperInfo proc near
-
-		push ebx           		 ; Save ebx
-		push edi           		 ; 
-		;------------------------
-		
-		;lea bx, CapLenMsg        ; USBCMD string
-		;sub bx, offset GreetMsg  ; Offset for DS
-		;call printStrPM          ; Prints string
-		
-		;-----------------------
-		; Out
-		pop edi                  ; Recover edi
-		pop ebx            		 ; Recover ebx 
-		
-		ret                      ;
-
-	endp
-
-
-	; Retieves and prints Operational register (USBCMD, USBSTS) 
-	; 
-	; EAX - contains offset for certain Register
-	; EBX - contains Base Address (BAR)
-	retrieveOperRegister proc near
-		
-		push eax			   	; Save eax
-		push ebx           		; Save ebx 
-		push ecx                ;
-		push dx                 ;
-
-		xor edx, edx            ; 
-		xor ecx, ecx            ;
-
-		mov dx, [ecx]           ;
-		add bx, cx         	    ;  
-		mov eax, dword ptr fs:[ebx]   	 
-						   		;  
-		push ax            		; Prints dword 
-		shr eax, 16             ; 
-		push ax                 ; 
-		call printWordFromStackPM
-		call printWordFromStackPM
-		
-		pop dx                  ; Recover registers
-		pop ecx                 ; 
-		pop ebx                 ;
-		pop eax             	;
- 		
-		ret
-	endp
-
 
 endm

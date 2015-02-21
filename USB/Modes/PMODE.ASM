@@ -1,4 +1,5 @@
 	include printlib.lib
+	include ehciOper.lib
 	include ehci.lib
 	.386p
 	pmode segment use16
@@ -171,10 +172,7 @@ printInVMem:
 	
 	
 	mov edi, 160                    ; 2nd Row
-	call printEHCICapInfo           ; Prints info about EHCI Capacity Registers 
-
-	;mov edi, 960                    ;
-	;call printEHCIOperInfo          ; Prints info about EHCI Operational Registers
+	call printEHCIInfo              ; Prints info about EHCI Capacity Registers 
 
 
 loop_dead:                          ; Dead loop
@@ -335,6 +333,8 @@ backToRM:
 ; Extra libs
 
 initPrint
+
+initOperationalInfo
 
 initEHCI
 
