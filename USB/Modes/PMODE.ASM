@@ -1,5 +1,6 @@
 	include printlib.lib
 	include ehciOper.lib
+	include ehciCap.lib
 	include ehci.lib
 	.386p
 	pmode segment use16
@@ -26,6 +27,7 @@ GDT_SIZE       = (GDT_end - GDT) - 1
 USBCMDoffset   = 00h
 USBSTSoffset   = 04h
 PeriodLBoffset = 14h
+
 
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
@@ -335,9 +337,12 @@ backToRM:
 
 initPrint
 
-initOperationalInfo
-
 initEHCI
+
+initCapacityInfo
+
+;initOperationalInfo
+
 
 ; =====================================================================================================
 ; GDT parameters

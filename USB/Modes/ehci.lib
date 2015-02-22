@@ -19,11 +19,11 @@ BAR2 = 0C3609000h
 
 		push eax 
 		
-		call printEHCIOperInfo	         ; Operational Registers information	
+		;call printEHCIOperInfo	         ; Operational Registers information	
 		
-		mov edi, 1120                    ; New place to print  
+		;mov edi, 1120                    ; New place to print  
 		
-		; call printEHCICapInfo            ; Capacity Registers information
+		call printEHCICapInfo            ; Capacity Registers information
   		
   		pop eax 
  	
@@ -31,134 +31,6 @@ BAR2 = 0C3609000h
 
 		jmp dead_loop                    ; Stopping 
 
-	endp
-
-
-
- 	; Prints information about HC Capacity I/O Registers 
-	;
-	; EBX - contains BAR address
-	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
-	; FS  - contains Selector For Zero Memory
-	; ES  - contains Video Memory Selector
-	printEHCICapInfo proc near
-
-		push ebx           		; Save ebx
-		push edi           		; 
-		;------------------------
-		
-		; Show HC Base Address
-		lea bx, HCGreet  		; Address HC string
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print HC string
-		mov ebx, BAR1      		; Gets BAR1	
-		
-		push bx 				; Saves Low Part
-		shr ebx, 16             ; Gets Significant Part
-		push bx					; Prints Base Address
-		call printWordFromStackPM
-		call printWordFromStackPM		
-
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
-
-		; Work with CAPLENGTH
-		lea bx, CapLenMsg  		; Address for CapLenMsg
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print CapLenMsg
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
-
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
-		
-		; Work with HCIVERSION 
-		lea bx, HCVersion  		; Address for HCVersion
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print HCVersion
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCIVERSION ; Write HCVersion for BAR1
-		
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
-		
-		; Work with HCSPARAMS 
-		lea bx, N_PORTS  		; Address for N_PORTS
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print N_PORTS
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
-		
-        pop edi                 ;
-        pop ebx                 ;
-        
-        ret
-
-     endp
-	
-	; Retieves and prints CAPLENGTH
-	;
-	; EBX - contains Base Address (BAR)
-	retrieveCAPLENGTH proc near
-
-		push ax			   		; Save ax
-		
-		xor ax, ax              ;
-
-		mov al, fs:[ebx]   		;   
-						   		; Prints CAPLENGTH
-		push ax            		; CAPLENGTH1
-		call printWordFromStackPM
-		
-		pop ax  
- 
-		ret
-	endp
-
-	; Retieves and prints EHCI Revision number 
-	;
-	; EBX - contains Base Address (BAR)
-	retrieveHCIVERSION proc near
-		
-		push ax			   	    ; Save ax
-		push ebx           		; Save ebx 
-		
-		add ebx, 2         		; Offset for HCIVersion 
-		mov ax, fs:[ebx]   		;   
-						   		; Prints CAPLENGTH
-		push ax            		; CAPLENGTH1
-		call printWordFromStackPM
-		
-		pop ebx          
-		pop ax             		; Recover registers
- 		
-		ret
-	endp
-
-	; Retieves and prints EHCI HCSPARAMS register 
-	; (In this case Number of ports for current HC)
-	;
-	; EBX - contains Base Address (BAR)
-	retrieveHCSPARAMS proc near
-		
-		push ax			   	    ; Save ax
-		push ebx           		; Save ebx 
-		
-		add ebx, 4         		; Offset for HCSPARAMS 
-		mov eax, dword ptr fs:[ebx]  ;   
-						   		; Prints Num Of Ports 
-		and ax, 0Fh             ; Only last 4 bits are needed
-		push ax            		; 
-		call printWordFromStackPM
-		
-		pop ebx          
-		pop ax             		; Recover registers
- 		
-		ret
-	
 	endp
 
 endm
