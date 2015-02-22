@@ -13,6 +13,7 @@ initOperationalInfo macro
 		push edi                 ; 
 		;------------------------
 		
+		; USB CMD
 		lea bx, USBCMDmsg       ; Address for Message
 		sub bx, offset GreetMsg ; Start of DS
 		call printStrPm    		; Print 
@@ -22,6 +23,7 @@ initOperationalInfo macro
 
 		call retrieveOperRegister
 
+		; USB STS 
 		pop edi                 ; Next Row 
 		add edi, ROWLENGTH      ; 
 		push edi                ; 
@@ -35,6 +37,20 @@ initOperationalInfo macro
 
 		call retrieveOperRegister
 
+		; Period List Base 
+		pop edi                 ; Next Row 
+		add edi, ROWLENGTH      ; 
+		push edi                ; 
+		
+		lea bx, PListBase       ; Address for Message
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print 
+
+		mov ebx, BAR1           ; 
+		mov eax, PeriodLBoffset ; USBSTS 
+		
+		call retrieveOperRegister
+		
 		;------------------------
 		; Out
 		pop edi 

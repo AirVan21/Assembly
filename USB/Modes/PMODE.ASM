@@ -25,6 +25,7 @@ GDT_SIZE       = (GDT_end - GDT) - 1
 ; Operational registers
 USBCMDoffset   = 00h
 USBSTSoffset   = 04h
+PeriodLBoffset = 14h
 
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
@@ -389,6 +390,7 @@ N_PORTS   db "Number of HC Ports = $"
 HCGreet   db "Host Controller    = $"
 USBCMDmsg db "USBCMD Register    = $"
 USBSTSmsg db "USBSTS Register    = $"
+PListBase db "Periodic List Base = $"
 
 ; INT CONSTS
 CAPLENGTH dw  020h
