@@ -48,6 +48,20 @@ initOperationalInfo macro
 
 		mov ebx, BAR1           ; 
 		mov eax, PeriodLBoffset ; USBSTS 
+
+		call retrieveOperRegister
+		
+		; PORTSC Register 
+		pop edi                 ; Next Row 
+		add edi, ROWLENGTH      ; 
+		push edi                ; 
+		
+		lea bx, PORTSCMsg       ; Address for Message
+		sub bx, offset GreetMsg ; Start of DS
+		call printStrPm    		; Print 
+
+		mov ebx, BAR1           ; 
+		mov eax, PORTSCoffset   ; PORTSC  
 		
 		call retrieveOperRegister
 		

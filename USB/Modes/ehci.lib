@@ -6,6 +6,11 @@ initEHCI macro
 BAR1 = 0C360A000h
 BAR2 = 0C3609000h
 
+DataTransm =  00950000h
+QHInMemory =  00A00000h
+qTDMemory  =  00B00000h
+inQTD      =  00B01000h
+lastOut    =  00B02000h
 
 ; =====================================================================================================
 
@@ -15,7 +20,7 @@ BAR2 = 0C3609000h
 	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
 	; FS  - contains Selector For Zero Memory
 	; ES  - contains Video Memory Selector
-	printEHCIInfo proc near
+	printEHCIInfo:
 
 		push eax 
 		
@@ -23,14 +28,94 @@ BAR2 = 0C3609000h
 		
 		;mov edi, 1120                    ; New place to print  
 		
-		call printEHCICapInfo            ; Capacity Registers information
+		;call printEHCICapInfo            ; Capacity Registers information
   		
+  		jmp configureUSBModule            ; Init USB Transaction Session 
+
   		pop eax 
  	
  	dead_loop:
 
 		jmp dead_loop                    ; Stopping 
 
-	endp
+
+	; QH initialication part 
+	configureUSBModule:
+
+		push eax                        ; Saves eax
+		push ebx 
+
+		; QH Horizontal Link Pointer
+		mov eax, QHInMemory             ;
+		mov fs:[eax], 00A00002h         ; 2-nd bit shows that this is QH
+		
+		; Endpoint characteristics
+		add eax, 4                      ;
+		mov fs:[eax], 0040D000h         ; 40 - max packet size; Low Speed Device Indication
+		
+		; Transaction information
+		add eax, 4 
+		mov fs:[eax], 40000000h         ; 
+
+		; Current qTD
+		add eax, 4 
+		xor ebx, ebx 
+		mov fs:[eax], ebx               ;
+
+		; Next qTD
+		add eax, 4 
+		mov ebx, 1                      
+		mov fs:[eax], ebx                ;
+		 
+		; Setting First Out Msg 
+		mov eax, qTDMemory              ;
+		mov fs:[eax], inQTD             ; Pointer to the next qTD
+
+		add eax, 4                      ;
+		xor ebx, ebx 
+		mov fs:[eax], ebx               ;
+
+		add eax, 4                      ;
+		mov ebx, 1
+		mov fs:[eax], ebx               ;
+
+		add eax, 4                      ;
+		mov ebx, 00080E80h
+		mov fs:[eax], ebx               ; Parameters for Setup Packet
+
+		jmp dead_loop                    ;
+		
+		mov ebx, DataTransm             ; Address of Data for Setup Msg
+		mov ecx, 80060001h
+		mov fs:[ebx], ecx               ; Data 1
+		mov ecx, 00004000h
+		add ebx, 4
+		mov fs:[ebx], ecx               ; Data 2
+	
+		add eax, 4                      ; Buffer Pointer
+		mov fs:[eax], DataTransm        ; 
+		
+		; Settin IN Msg 
+		mov eax, inQTD                  ;
+
+
+		pop ebx                          ;
+		pop eax                          
+
+		jmp dead_loop                    ;
+
+
+	setQTD:
+
+		push eax                        ;
+		push ebx 
+		push ecx 
+		
+		
+		pop ecx                         ;
+		pop ebx                         ;
+		pop eax                         ;
+		
+		jmp dead_loop  
 
 endm

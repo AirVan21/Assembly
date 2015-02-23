@@ -27,7 +27,7 @@ GDT_SIZE       = (GDT_end - GDT) - 1
 USBCMDoffset   = 00h
 USBSTSoffset   = 04h
 PeriodLBoffset = 14h
-
+PORTSCOffset   = 44h 
 
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
@@ -175,7 +175,7 @@ printInVMem:
 	
 	
 	mov edi, 160                    ; 2nd Row
-	call printEHCIInfo              ; Prints info about EHCI Capacity Registers 
+	jmp printEHCIInfo               ; Prints info about EHCI Capacity Registers 
 
 
 loop_dead:                          ; Dead loop
@@ -339,7 +339,7 @@ initPrint
 
 initEHCI
 
-initCapacityInfo
+;initCapacityInfo
 
 ;initOperationalInfo
 
@@ -396,6 +396,7 @@ HCGreet   db "Host Controller    = $"
 USBCMDmsg db "USBCMD Register    = $"
 USBSTSmsg db "USBSTS Register    = $"
 PListBase db "Periodic List Base = $"
+PORTSCMsg db "PORTSC Register    = $"
 
 ; INT CONSTS
 CAPLENGTH dw  020h
