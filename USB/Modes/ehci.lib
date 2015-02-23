@@ -30,7 +30,8 @@ lastOut    =  00B02000h
 		
 		;call printEHCICapInfo            ; Capacity Registers information
   		
-  		jmp configureUSBModule            ; Init USB Transaction Session 
+  		lea eax, configureUSBModule        ;
+  		call eax                          ; Init USB Transaction Session 
 
   		pop eax 
  	
@@ -64,7 +65,7 @@ lastOut    =  00B02000h
 
 		; Next qTD
 		add eax, 4 
-		mov ebx, 1                      
+		mov ebx, qTDMemory                      
 		mov fs:[eax], ebx                ;
 		 
 		; Setting First Out Msg 
@@ -83,8 +84,6 @@ lastOut    =  00B02000h
 		mov ebx, 00080E80h
 		mov fs:[eax], ebx               ; Parameters for Setup Packet
 
-		jmp dead_loop                    ;
-		
 		mov ebx, DataTransm             ; Address of Data for Setup Msg
 		mov ecx, 80060001h
 		mov fs:[ebx], ecx               ; Data 1
@@ -103,19 +102,5 @@ lastOut    =  00B02000h
 		pop eax                          
 
 		jmp dead_loop                    ;
-
-
-	setQTD:
-
-		push eax                        ;
-		push ebx 
-		push ecx 
-		
-		
-		pop ecx                         ;
-		pop ebx                         ;
-		pop eax                         ;
-		
-		jmp dead_loop  
 
 endm
