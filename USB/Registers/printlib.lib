@@ -1,0 +1,93 @@
+initPrint	macro
+	
+
+	; Prints string while (charToPrint != '$')
+	;
+	; DS - data segment   pointer
+	; ES - screen segment pointer
+	; BX - offset in printing string
+	; DI - offset for printing string in Video Mem
+	printStrPM proc near
+
+		push ax             ; Save AX
+		
+		mov	ah, 05h			; Print style
+	
+	putChar:
+
+		mov al, [bx]		; Get char to print
+		cmp al, '$'         ;
+		jz outPutChar       ; Stop printing
+		add bx, 1           ;
+		mov es:[di], ax     ; Puts char & font in video mem
+		add di, 2           ; Points to next place in video mem
+
+		jmp putChar         ;  
+	
+	outPutChar:
+		
+		pop ax              ; Recover AX
+		ret                 ;
+	
+	endp
+
+	; Function, which prints Word(16-bit) from Stack 	
+	; Working in Protected Mode 
+	; 
+	; ES - screen segment pointer
+	; DI - offset for printing in Video Memory 
+	; 
+	; AX, BX are changed
+	; DI changed (correct offset for print should be saved)
+	printWordFromStackPM proc near
+
+		pop bx                 ; ret address
+		pop ax                 ; Word to Print
+		
+		push bx                ; Push ret address
+		push ecx               ; Save ecx
+		
+		mov cx, ax             ; CX - saver for original number
+		lea bx, hex_table      ; Loads hex table for translation
+		sub bx, offset greetMsg; Points to hex_table start (in PM)
+
+		; First digit
+		shr ax, 12             ; Set alone digit
+		xlat                   ; Translates
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		; Second digit
+		mov ax, cx             ; 
+		shr ax, 8              ;
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		; Third digit
+		mov ax, cx             ; 
+		shr ax, 4              ;
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		; Fourth digit
+		mov ax, cx             ; 
+		and ax, 0Fh            ; Set alone digit
+		xlat                   ; Translates                  
+		mov ah, 05h            ; Style for Video Memory
+		mov es:[di], ax        ;
+		add di, 2              ; Points to the next place
+		
+		pop ecx                ;
+	
+		ret                    ;
+
+	endp
+
+endm

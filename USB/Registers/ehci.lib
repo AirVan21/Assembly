@@ -1,0 +1,35 @@
+initEHCI macro
+	
+; =====================================================================================================
+; Temporary BAR information
+
+BAR1 = 0C360A000h
+BAR2 = 0C3609000h
+
+; =====================================================================================================
+
+ 	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address | Or Not 
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
+	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
+	printEHCIInfo proc near
+
+		push eax 
+		
+		call printEHCICapInfo             ; Capacity Registers
+		
+		mov edi, 1120                     ; New place to print  
+		
+		;call printEHCIOperInfo	          ; Operational Registers information	
+		
+  		pop eax 
+ 	
+ 	dead_loop:
+
+		jmp dead_loop                    ; Stopping 
+
+	endp
+
+endm
