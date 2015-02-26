@@ -1,0 +1,68 @@
+messageLib macro
+
+; =====================================================================================================
+; Temporary BAR information
+
+BAR1 = 0C360A000h
+BAR2 = 0C3609000h
+
+
+qTDOffset = 20h 
+
+QHInMem    =  00A00000h
+qTDfirst   =  00A00100h
+
+
+	; Setup Queue Head Handle a Control Traffiic
+	;
+	; DS - data segment   pointer
+	; ES - screen segment pointer
+	; DI - offset for printing string in Video Mem
+	createMessageSequence:
+
+		;===============================
+		; Constructing a Queue Head 
+
+		push eax                        ; Saves eax
+		push ebx 
+		push edx 
+
+		; QH Horizontal Link Pointer
+		mov eax, QHInMem                ; Pointer to the next Queue, which should be processed
+		mov fs:[eax], 00A00002h         ; 2-nd bit shows that this is QH
+
+		; Endpoint characteristics 
+		add eax, 4                      ;
+		mov fs:[eax], 0040D000h         ; 40 - max packet size; Low Speed Device Indication
+
+		; Transaction information
+		add eax, 4 
+		mov fs:[eax], 40000000h         ; One transaction per microframe
+
+		; Current qTD
+		add eax, 4                      ; Set as Zerp
+		xor ebx, ebx 
+		mov fs:[eax], ebx               ;
+
+		; Next qTD
+		add eax, 4 
+		mov ebx, qTDfirst               ; Pointer to first qTD to process                        
+		mov fs:[eax], ebx               ;
+
+		;===============================
+		; Constructing qTD
+
+
+		mov ebx, fs:[eax]               ;
+		push bx
+		shr ebx, 16
+		push bx
+
+		call CODE_SELECTOR:printWordFromStackPM       
+		call CODE_SELECTOR:printWordFromStackPM       
+		
+
+		jmp loop_dead
+
+
+endm
