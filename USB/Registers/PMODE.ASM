@@ -63,7 +63,7 @@ set_prot_mode:
 	
 	xor eax, eax                    ;
 	xor edx, edx                    ;
-	 
+		
 	; Sets Code Descriptor
 	mov bx, offset GDT + 8          ; Skip Null-Descriprot, point to CODE_DESCRIPTOR 
 	                                ; DS is set
@@ -270,9 +270,10 @@ enable_interrupts:
 ; Extra libs
 
 initEHCI
+initPrint
 initCapacityInfo
 initOperationalInfo
-initPrint
+
 
 ; =====================================================================================================
 ; GDT parameters

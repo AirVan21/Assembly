@@ -12,18 +12,17 @@
 		push edi           		; 
 		;------------------------
 		
-		
 		; Show HC Base Address
 		lea bx, HCGreet  		; Address HC string
 		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm         ; Print HC string
+		call CODE_SELECTOR:printStrPm         ; Print HC string
 		mov ebx, BAR1      		; Gets BAR1	
 		
 		push bx 				; Saves Low Part
 		shr ebx, 16             ; Gets Significant Part
 		push bx					; Prints Base Address
-		call printWordFromStackPM
-		call printWordFromStackPM		
+		call CODE_SELECTOR:printWordFromStackPM
+		call CODE_SELECTOR:printWordFromStackPM		
 
 		pop edi           		; Recover Print Point
 		add edi, ROWLENGTH 		; Next Row

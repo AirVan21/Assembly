@@ -3,8 +3,8 @@ initEHCI macro
 ; =====================================================================================================
 ; Temporary BAR information
 
-BAR1 = 0C360A000h
-BAR2 = 0C3609000h
+BAR2 = 0C360A000h
+BAR1 = 0C3609000h
 
 ; =====================================================================================================
 
@@ -18,11 +18,11 @@ BAR2 = 0C3609000h
 
 		push eax 
 		
-		call printEHCICapInfo             ; Capacity Registers
+		call CODE_SELECTOR:printEHCICapInfo             ; Capacity Registers
 		
-		mov edi, 1120                     ; New place to print  
+		mov edi, 1120                    				; New place to print  
 		
-		;call printEHCIOperInfo	          ; Operational Registers information	
+		call CODE_SELECTOR:printEHCIOperInfo	        ; Operational Registers information	
 		
   		pop eax 
  	

@@ -16,12 +16,12 @@ initOperationalInfo macro
 		; USB CMD
 		lea bx, USBCMDmsg       ; Address for Message
 		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm         ; Print 
+		call CODE_SELECTOR:printStrPm         ; Print 
 
 		mov ebx, BAR1           ; 
 		mov eax, USBCMDoffset   ; USBCMD 
 
-		call retrieveOperRegister
+		call CODE_SELECTOR:retrieveOperRegister
 
 		; USB STS 
 		pop edi                 ; Next Row 
@@ -30,7 +30,7 @@ initOperationalInfo macro
 		
 		lea bx, USBSTSmsg       ; Address for Message
 		sub bx, offset GreetMsg ; Start of DS
-		call ds:printStrPm    	; Print 
+		call CODE_SELECTOR:printStrPm    	; Print 
 
 		mov ebx, BAR1           ; 
 		mov eax, USBSTSoffset   ; USBSTS 
@@ -44,26 +44,27 @@ initOperationalInfo macro
 		
 		lea bx, PListBase       ; Address for Message
 		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print 
+		call CODE_SELECTOR:printStrPm    		; Print 
 
 		mov ebx, BAR1           ; 
 		mov eax, PeriodLBoffset ; USBSTS 
 
-		call retrieveOperRegister
+		call CODE_SELECTOR:retrieveOperRegister
 		
 		; PORTSC Register 
-		pop edi                 ; Next Row 
-		add edi, ROWLENGTH      ; 
-		push edi                ; 
 		
-		lea bx, PORTSCMsg       ; Address for Message
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print 
+		;pop edi                 ; Next Row 
+		;add edi, ROWLENGTH      ; 
+		;push edi                ; 
+		
+		;lea bx, PORTSCMsg       ; Address for Message
+		;sub bx, offset GreetMsg ; Start of DS
+		;call CODE_SELECTOR:printStrPm    ; Print 
 
-		mov ebx, BAR1           ; 
-		mov eax, PORTSCoffset   ; PORTSC  
+		;mov ebx, BAR1           ; 
+		;mov eax, PORTSCoffset   ; PORTSC  
 		
-		call retrieveOperRegister
+		;call CODE_SELECTOR:retrieveOperRegister
 		
 		;------------------------
 		; Out
@@ -92,9 +93,8 @@ initOperationalInfo macro
 		push ax                 ; Print USBCMD
 		shr eax, 16             ;
 		push ax                 ;
-		call printWordFromStackPM
-		call printWordFromStackPM
-		
+		call CODE_SELECTOR:printWordFromStackPM
+		call CODE_SELECTOR:printWordFromStackPM
 		pop eax             	;
 		pop ebx                 ;
 		
