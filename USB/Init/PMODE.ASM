@@ -1,4 +1,5 @@
 	include printlib.lib
+	include ehciOper.lib
 	include message.lib
 	.386p
 	pmode segment use16
@@ -165,9 +166,7 @@ protectedModeAction:
 	mov edi, 160                    ; 2nd Row
 
 	; Perform UBS Queue Building
-	jmp CODE_SELECTOR:createMessageSequence 
-		
-
+	jmp CODE_SELECTOR:introInMessaging
 loop_dead:                          ; Dead loop
 	
 	jmp	loop_dead
@@ -271,6 +270,7 @@ enable_interrupts:
 
 initPrint
 messageLib
+initOperationalInfo
 
 ; =====================================================================================================
 ; GDT parameters

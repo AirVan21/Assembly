@@ -7,10 +7,55 @@ BAR1 = 0C360A000h
 BAR2 = 0C3609000h
 
 
-qTDOffset = 20h 
+qTDOffset   = 40h 
+qBuffOffset = 00008000h
 
 QHInMem    =  00A00000h
 qTDfirst   =  00A00100h
+qTDBuffer  =  00900000h
+
+	; Extra function Processing start 
+	; 
+	;
+	introInMessaging:
+
+		; USB STS 
+		mov edi, 160                           ; 
+		
+		lea bx, USBSTSmsg                      ; Address for Message
+		sub bx, offset GreetMsg                ; Start of DS
+		call CODE_SELECTOR:printStrPm    	   ; Print 
+
+		mov ebx, BAR1                          ; 
+		mov eax, USBSTSoffset                  ; USBSTS 
+
+		call CODE_SELECTOR:retrieveOperRegister
+
+		jmp CODE_SELECTOR:createMessageSequence
+
+	outInit:
+
+		mov ebx, BAR2   
+		add ebx, 20h                           ; Offset for Operational Registers
+		add ebx, PeriodLBoffset                ; 
+		mov fs:[ebx], QHInMem                  ;
+
+		mov edi, 320                           ; 
+		
+		lea bx, USBSTSmsg                      ; Address for Message
+		sub bx, offset GreetMsg                ; Start of DS
+		call CODE_SELECTOR:printStrPm    	   ; Print 
+
+		mov ebx, BAR1                          ; 
+		mov eax, USBSTSoffset                  ; USBSTS 
+
+		;call CODE_SELECTOR:retrieveOperRegister
+
+
+	dead_loop:
+
+		jmp dead_loop
+
 
 
 	; Setup Queue Head Handle a Control Traffiic
@@ -24,8 +69,8 @@ qTDfirst   =  00A00100h
 		; Constructing a Queue Head 
 
 		push eax                        ; Saves eax
-		push ebx 
-		push edx 
+		push ebx                        ; 
+		push edx                        ; Will be used as a mem pointer
 
 		; QH Horizontal Link Pointer
 		mov eax, QHInMem                ; Pointer to the next Queue, which should be processed
@@ -51,18 +96,58 @@ qTDfirst   =  00A00100h
 
 		;===============================
 		; Constructing qTD
-
-
-		mov ebx, fs:[eax]               ;
-		push bx
-		shr ebx, 16
-		push bx
-
-		call CODE_SELECTOR:printWordFromStackPM       
-		call CODE_SELECTOR:printWordFromStackPM       
 		
+		; Next qTD pointer 
+		mov eax, qTDfirst               ; Address of first qTD 
+		mov edx, eax                    ; 
+		add edx, qTDOffset              ; Points to the next qTD 
+		mov fs:[eax], edx               ; Puts pointer in qTD 
 
-		jmp loop_dead
+		; Alternative qTD  
+		mov edx, eax                    ;
+		add edx, 4                      ; Next field
+		xor eax, eax                    ;
+		mov fs:[edx], eax               ; Alternative qTD = 0h 
+
+		; qTD token                    
+		add edx, 4                      ; 
+		mov eax, 00080E80h              ; Setting Setup PID | 8 byte Payload
+		mov fs:[edx], eax               ; 
+
+		; qTD Buffer Pointer list
+		; 4Kbyte aligned 
+		add edx, 4                      ;
+		mov eax, qTDBuffer              ; Payload Pointer 
+		mov fs:[edx], eax               ; 
+
+		; Write Payload (8 byte)
+		mov eax, qTDBuffer              ;
+		mov ebx, 80060001h              ; GET_DESCRIPTOR (Device)
+		mov fs:[eax], ebx               ;
+		add eax, 4                      ;
+		mov ebx, 00004000h              ; Length of Descriptor 
+		mov fs:[eax], ebx               ;
+
+		;===============================
+		; 
+		
+		pop edx
+		pop ebx
+		pop eax 
+		
+		jmp CODE_SELECTOR:initListBase              
+
+		
+	initListBase:
+
+		push eax                        ; Saves eax
+		push ebx                        ; 
+
+		jmp CODE_SELECTOR:outInit
+
+		pop ebx                         ; Recover 
+		pop eax 
+
 
 
 endm
