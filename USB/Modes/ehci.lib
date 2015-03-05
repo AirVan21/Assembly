@@ -3,6 +3,8 @@ initEHCI macro
 ; =====================================================================================================
 ; Temporary BAR information
 
+ROWLENGTh      = 80 * 2       ; 80 Symbols x (1 Byte for Char + 1 Byte for Style)
+
 BAR1 = 0C360A000h
 BAR2 = 0C3609000h
 
@@ -11,6 +13,26 @@ QHInMemory =  00A00000h
 qTDMemory  =  00B00000h
 inQTD      =  00B01000h
 lastOut    =  00B02000h
+
+; Operational registers
+USBCMDoffset   = 00h
+USBSTSoffset   = 04h
+PeriodLBoffset = 14h
+PORTSCOffset   = 44h 
+
+hex_table db "0123456789ABCDEF"
+CapLenMsg db "CAPLENGTH Register = $"
+HCVersion db "EHCI Revision      = $"
+N_PORTS   db "Number of HC Ports = $"
+HCGreet   db "Host Controller    = $"
+USBCMDmsg db "USBCMD Register    = $"
+USBSTSmsg db "USBSTS Register    = $"
+PListBase db "Periodic List Base = $"
+PORTSCMsg db "PORTSC Register    = $"
+
+
+; INT CONSTS
+CAPLENGTH dw  020h
 
 ; =====================================================================================================
 

@@ -1,5 +1,11 @@
 initPrint	macro
-	
+
+; =====================================================================================================
+; Translation Table	
+
+hex_table db "0123456789ABCDEF"
+
+; =====================================================================================================
 
 	; Prints string while (charToPrint != '$')
 	;
@@ -89,7 +95,7 @@ initPrint	macro
 		
 		mov cx, ax             ; CX - saver for original number
 		lea bx, hex_table      ; Loads hex table for translation
-		sub bx, offset greetMsg; Points to hex_table start (in PM)
+		sub bx, offset DATA_SEG_START; Points to hex_table start (in PM)
 
 		; First digit
 		shr ax, 12             ; Set alone digit

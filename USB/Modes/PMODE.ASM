@@ -1,7 +1,4 @@
 	include printlib.lib
-	include ehciOper.lib
-	include ehciCap.lib
-	include ehci.lib
 	.386p
 	pmode segment use16
 	assume	cs:pmode, ds:pmode, es:pmode
@@ -15,19 +12,12 @@ _:
 	jmp start  				  ;  Marker to place, where program starts	
 
 ; INT CONSTS
-ROWLENGTh      = 80 * 2       ; 80 Symbols x (1 Byte for Char + 1 Byte for Style)
 CMOS_PORT_ID   = 70h          ; Port for CMOS memory access	
-
 VIDEO_BASE     = 0B8000h      ; Video memory for color monitors
-CODE_LIMIT     = 1024         ;
+VIDEO_SIZE     = 400          ;
+CODE_LIMIT     = 2048         ;
 STACK_LIMIT    = 1024         ; 
 GDT_SIZE       = (GDT_end - GDT) - 1
-
-; Operational registers
-USBCMDoffset   = 00h
-USBSTSoffset   = 04h
-PeriodLBoffset = 14h
-PORTSCOffset   = 44h 
 
 ; Descriptor Offsets
 CODE_SELECTOR    = 8          ; Code
@@ -61,36 +51,32 @@ start:
 ; CL    - Access rights
 set_prot_mode:
 	
+	call saveRMregisters            ; Saves registers from real mode                   ; 
+
 	xor eax, eax                    ;
 	xor edx, edx                    ;
-
-	call saveRMregisters            ; Saves registers from real mode  
-
-	mov RMODE_CS, cs                ; Saves code segment for returning to real mode
-	lea ax, backToRM                ; 
-	mov RMODE_IP, ax                ; Saves IP to start RM code 
 	
-	xor eax, eax                    ; 
-
 	; Sets Code Descriptor
 	mov bx, offset GDT + 8          ; Skip Null-Descriprot, point to CODE_DESCRIPTOR 
 	                                ; DS is set
 	push cs                         ; For Code Segment Address
 	pop ax                          ; 
 	shl eax, 4                      ; Code Segment Address
-	;add bx, 8                       ; 
 	mov dx, CODE_LIMIT              ; Simple segment limit
 	mov cl, CODE_ACCESS_R           ; Code access rights
 	
-	call setDescriptor              ; 
+	call setDescriptor              ; Setting Code Descriptor
 	
 	; Sets Stack Descriptor
+	push cs                         ; 
+	pop ax                          ;
+	shl eax, 4                      ;
 	lea dx, STACK_SEG_START         ; Stack Segment Start Address
 	add eax, edx                    ; Code Segment Address + Mark offset
 	mov dx, STACK_LIMIT             ; Stack limit
 	mov cl, STACK_ACCESS_R          ; Stack access rights
 	
-	call setDescriptor              ;
+	call setDescriptor              ; Setting Stack Descriptor
 
 	; Sets Data Descriptor
 	xor eax, eax                    ;
@@ -103,20 +89,19 @@ set_prot_mode:
 	sub dx, cx                      ; Correct Data Limit in cx
 	mov cl, DATA_ACCESS_R           ; Data access right 
 	
-	call setDescriptor              ;
+	call setDescriptor              ; Setting Data Descriptor
 
 	; Sets Screen Descriptor
 	mov eax, VIDEO_BASE             ; Video Segment Address
-	mov	edx, 4000	                ; Video Segment Size (80 * 25 * 2 = 4000).
+	mov	edx, VIDEO_SIZE	            ; Video Segment Size (80 * 25 * 2 = 4000).
 	mov cl, SCREEN_ACCESS_R         ; Screen access rights
 	
-	call setDescriptor              ;
+	call setDescriptor              ; Setting Screen Descriptor
 
 	; Memory (Zero) Descriptor
-				                     ; Zero Address Descriptor is hardcoded 
-	add bx, 8                        ; Moves to the next descriptor
+				                    ; Zero Address Descriptor is hardcoded 
+	add bx, 8                       ; Moves to the next descriptor
 	
-
 	call setParamGDT           		; Calculate GDT address, size
 	
 	; Sets extra RM Code Descriptor
@@ -127,18 +112,18 @@ set_prot_mode:
 	mov edx, 0FFFFh                 ; Limit 64K 
 	mov cl, RM_CODE_ACCESS_R        ; 
 
-	call setDescriptor              ;
+	call setDescriptor              ; Setting Real Mode Code Descriptor
 	
 	; Sets extra RM Data Descriptor 
 	mov cl, RM_DATA_ACCESS_R        ;
 
-	call setDescriptor              ; 
+	call setDescriptor              ; Setting Real Mode Data Descriptor
 
 	call disable_interrupts         ; Disables interrupts
 	
 	lgdt GDTR               		; Load GDT   
 	
-	mov RMODE_SP, sp                ; Saves Stack Pointer
+	mov RMODE_SP, sp                ; Saves Stack Pointer (After all)
 
 	; Moving to Protected Mode 
 	mov	eax, cr0                    ; Getting signalling register
@@ -150,7 +135,7 @@ set_prot_mode:
 	dw setMainRegister              ; Argument for jump command
 	dw CODE_SELECTOR                ; Argument for jump command
 	
-
+; Sets correct selectors in main Registers
 setMainRegister:
 
 	; Sets appropriate selectors
@@ -166,25 +151,11 @@ setMainRegister:
 	mov	sp, 0
 	
 	mov ax, MEMORY_SELECTOR         ; Points to prepared zero-mem descriptor
-	mov fs, ax                      ;
+	mov fs, ax                      ; Remmembering Descriptor (Roden technique)
 
-	jmp printInVMem      
-
-; Prints string to Video Memory
-printInVMem:
-	
-	
-	mov edi, 160                    ; 2nd Row
-	jmp printEHCIInfo               ; Prints info about EHCI Capacity Registers 
-
-
-loop_dead:                          ; Dead loop
-	
-	jmp	loop_dead
-
-	jmp preBackToRM                 ;  Moving to Pre Real Mode Code Part
-
-
+	db	0eah						;  Far Jump
+	dw	PreBackToRM                 ;  
+	dw	RM_CODE_SELECTOR            ;  Moving to Pre Real Mode Code 
 
 ; Fill correct parameters for GDT register
 setParamGDT:
@@ -215,67 +186,71 @@ setParamGDT:
 ; CL    - Access rights
 setDescriptor:
 	
-	push eax                       ; Save eax
-	push ecx                       ; Save ecx
-	push cx                        ; Save Acess rights
+	push eax                     	; Save eax
+	push ecx                     	; Save ecx
+	push cx                      	; Save Acess rights
 	
-	mov cx, ax                     ; Copy first (Jr) part of Address
-	shl ecx, 16                    ; Shift 
-	mov cx, dx                     ; Copy first (Jr) part of Limit
+	mov cx, ax                   	; Copy first (Jr) part of Address
+	shl ecx, 16                  	; Shift 
+	mov cx, dx                   	; Copy first (Jr) part of Limit
 
-	mov [bx], ecx                  ; Writing descriptors first (Jr) part 
+	mov [bx], ecx                	; Writing descriptors first (Jr) part 
 
-	shr eax, 16                    ; Shift 16-bit (Second part of Address now)
-	mov cl, ah                     ; To cl bit (24-31) from Address  (Part 1)
-	shl ecx, 24                    ; Kill ecx byte
-	mov cl, al                     ; To cl bit (16-23) from Address  (Part 2)
+	shr eax, 16                  	; Shift 16-bit (Second part of Address now)
+	mov cl, ah                   	; To cl bit (24-31) from Address  (Part 1)
+	shl ecx, 24                  	; Kill ecx byte
+	mov cl, al                   	; To cl bit (16-23) from Address  (Part 2)
 
-	shr edx, 16                    ; Oldest Limit Part 
-	and dx, 0Fh                    ; Set only last 4-bits
-	pop ax                         ; Get Acess right 
-	mov ch, al                     ; Acess to 2-nd ecx byte
-                                   ; Oldest Limit part is zero
-                                   ; G D X U      part is zero
-    mov [bx + 4], ecx              ; Writing descriptors second part
-    mov [bx + 6], dl               ; Write Oldest Part
-    add bx, 8                      ; Add 8 bytes to access next descriptor 
+	pop ax                       	; Get Acess right 
+	mov ch, al                   	; Acess to 2-nd ecx byte
+                                 	; Oldest Limit part is zero                                 
+                                 	; G D X U      part is zero
+    mov [bx + 4], ecx            	; Writing descriptors second part
+    add bx, 8                    	; Add 8 bytes to access next descriptor 
 	
-	pop ecx                        ; Recover ecx
-	pop eax                        ; Recover eax                       
+	pop ecx                      	; Recover ecx
+	pop eax                      	; Recover eax                       
 	
-	db 0C3h                        ; ret
+	db 0C3h                      	; ret
 
 ; Disables Maskable && Non-Maskable interrupts
 disable_interrupts:
 	
-	xor eax, eax         ;
-	push dx              ; Save dx
-	xor dx, dx           ;
-	cli                  ; Blocking Maskable Interrupts
-	mov dx, CMOS_PORT_ID ; (Params should be registers)
-	in  al, dx           ; Getting CMOS-byte
-	or  al, 80h          ; First bit for Non-Maskable
-	                     ; 0 - Enabled, 1 - Disables
-	out dx, al           ; Disabling NMI 
-	pop dx               ; Recover dx
+	push ax                     	; Save ax  
+	push dx              			; Save dx 
 	
-	db 0C3h              ; ret
+	xor ax, ax                  	; 
+	cli                  			; Blocking Maskable Interrupts
+	mov dx, CMOS_PORT_ID 			; (Params should be registers)
+	in  al, dx           			; Getting CMOS-byte
+	or  al, 80h          			; First bit for Non-Maskable
+	                     			; 0 - Enabled, 1 - Disables
+	out dx, al           			; Disabling NMI 
+	
+	pop dx               			; Recover dx
+	pop ax                      	; Recover ax 
+
+	db 0C3h              			; ret
 
 ; Enables Maskable && Non-Maskable interrupts
 enable_interrupts:
 	
-	xor eax, eax         ;
-	push dx              ; Save dx
-	xor dx, dx           ;
-	mov dx, CMOS_PORT_ID ; 
-	in  al, dx           ; Getting CMOS-byte
-	and al, 7Fh          ; Setting first bit to zero 
-	                     ; 0 - Enables NMI
-	out dx, al           ;
-	pop dx               ; Recover dx
-	sti                  ; Enable Maskable interrupt
+	push ax                     	; Save ax 
+	push dx              			; Save dx
+
+	xor ax, ax           			;
+	mov dx, CMOS_PORT_ID 			; 
+	in  al, dx           			; Getting CMOS-byte
+	and al, 7Fh          			; Setting first bit to zero 
+	                     			; 0 - Enables NMI
+	out dx, al           			;
 	
-	db 0C3h              ; ret
+	pop dx               			; Recover dx
+	pop ax                      	; Recover ax 
+
+	sti                  			; Enable Maskable interrupt
+	
+	db 0C3h              			; ret
 
 ; Saves registers from real mode
 saveRMregisters:
@@ -284,8 +259,12 @@ saveRMregisters:
 	mov RMODE_SS, ss 
 	mov RMODE_DS, ds 
 	mov RMODE_ES, es 
-	mov RMODE_FS, fs
 	mov RMODE_GS, gs
+	; Saves Real Mode Return Point
+	mov RMODE_CS, cs                ; Saves code segment for returning to real mode
+	lea ax, backToRM                ; 
+	mov RMODE_IP, ax                ; Saves IP to start RM code 
+	
 
 	db 0C3h              ; ret
 
@@ -300,18 +279,18 @@ preBackToRM:
 	mov ss, ax              
 	mov ds, ax 
 	mov es, ax 
-	mov fs, ax 
+	;mov fs, ax 
 	mov gs, ax 
 	
 	; Drop PE first bit 
-	mov eax, cr0		; 	
-	and al, 0feh        ; Set last bit = 0
-	mov cr0, eax        ; Apply changes
+	mov eax, cr0				; 	
+	and al, 0feh       			; Set last bit = 0 (Real Mode)
+	mov cr0, eax        		; Apply changes
 
-	db 0eah             ; Far jump RMODE_CS : RMODE_IP
+	db 0eah             		; Far jump RMODE_CS : RMODE_IP
 
-RMODE_IP dw    ?        ; Argument
-RMODE_CS dw    ?        ; Argument
+RMODE_IP dw    ?        		; Argument
+RMODE_CS dw    ?        		; Argument
 
 ; Real mode code
 backToRM:
@@ -319,38 +298,28 @@ backToRM:
 	; Recover Real Mode Registers	
 	mov ss, RMODE_SS    
 	mov es, RMODE_ES
-	mov fs, RMODE_FS
 	mov ds, RMODE_DS
 	mov gs, RMODE_GS
 	mov sp, RMODE_SP
 
-	call enable_interrupts ; Enables interrupts
+	; FS register will be used for Addressing data 
+
+	call enable_interrupts 		; Enables interrupts
 	
-	int 20h             ; Exit()
+	int 20h             		; Exit()
 
-	db 0C3h             ; ret
-
-
+	db 0C3h             		; ret
 
 ; =====================================================================================================
 ; Extra libs
 
-initPrint
-
-initEHCI
-
-;initCapacityInfo
-
-;initOperationalInfo
-
 
 ; =====================================================================================================
 ; GDT parameters
-GDTR	label	fword
+GDTR label fword
 
 GDT_lim		dw	?
 GDT_adr		dd	?
-
 
 ; The main Global Descriptors Table (GDT) (shuold have 8192 records) 
 
@@ -374,7 +343,7 @@ GDT:
 	dd 	?, ?
 	dd 	?, ?
 	dd 	?, ?
-	db  0FFh, 0FFh, 00h, 00h, 00h, 10010010b, 11001111b, 00h	; Descriptor for Zero Memory Point 
+	db  0FFh, 0FFh, 00h, 00h, 00h, 10010010b, 11001111b, 00h	; Descriptor for Zero Memory Point (FS)
 	
 	; Descriptors for Real Mode
 	dd 	?, ?
@@ -386,21 +355,9 @@ GDT_end:
 ; PM Data Part
 
 DATA_SEG_START:
-; STRING CONSTS 
-GreetMsg  db "Protected mode on!$"
-hex_table db "0123456789ABCDEF"
-CapLenMsg db "CAPLENGTH Register = $"
-HCVersion db "EHCI Revision      = $"
-N_PORTS   db "Number of HC Ports = $"
-HCGreet   db "Host Controller    = $"
-USBCMDmsg db "USBCMD Register    = $"
-USBSTSmsg db "USBSTS Register    = $"
-PListBase db "Periodic List Base = $"
-PORTSCMsg db "PORTSC Register    = $"
 
-; INT CONSTS
-CAPLENGTH dw  020h
-  
+; STRING CONSTS 
+GreetMsg2  db "Real mode on!", 13, 10, "$"
 
 DATA_SEG_END:
 
@@ -421,7 +378,6 @@ RMODE_SP dw 	?
 RMODE_DS dw 	?
 RMODE_ES dw 	?
 RMODE_GS dw 	?
-RMODE_FS dw 	?
 
 	main endp
 	pmode ends
