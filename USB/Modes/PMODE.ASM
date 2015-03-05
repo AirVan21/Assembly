@@ -3,7 +3,7 @@
 	pmode segment use16
 	assume	cs:pmode, ds:pmode, es:pmode
 
-	org 100h          		 ;  Going to create .COM file
+	org 100h          		
 
 main proc far
 
@@ -260,6 +260,7 @@ saveRMregisters:
 	mov RMODE_DS, ds 
 	mov RMODE_ES, es 
 	mov RMODE_GS, gs
+	
 	; Saves Real Mode Return Point
 	mov RMODE_CS, cs                ; Saves code segment for returning to real mode
 	lea ax, backToRM                ; 
@@ -274,23 +275,23 @@ saveRMregisters:
 ; G = 0, E = 0, W = 1, P = 1
 preBackToRM:
 	
-	mov ax, RM_DATA_SELECTOR ; Real Mode Data Selector 
+	mov ax, RM_DATA_SELECTOR 		; Real Mode Data Selector 
+	
 	; Load similar value
 	mov ss, ax              
 	mov ds, ax 
 	mov es, ax 
-	;mov fs, ax 
 	mov gs, ax 
 	
 	; Drop PE first bit 
-	mov eax, cr0				; 	
-	and al, 0feh       			; Set last bit = 0 (Real Mode)
-	mov cr0, eax        		; Apply changes
+	mov eax, cr0					; 	
+	and al, 0feh       				; Set last bit = 0 (Real Mode)
+	mov cr0, eax        			; Apply changes
 
-	db 0eah             		; Far jump RMODE_CS : RMODE_IP
+	db 0eah             			; Far jump RMODE_CS : RMODE_IP
 
-RMODE_IP dw    ?        		; Argument
-RMODE_CS dw    ?        		; Argument
+RMODE_IP dw    ?        			; Argument
+RMODE_CS dw    ?        			; Argument
 
 ; Real mode code
 backToRM:
@@ -357,7 +358,6 @@ GDT_end:
 DATA_SEG_START:
 
 ; STRING CONSTS 
-GreetMsg2  db "Real mode on!", 13, 10, "$"
 
 DATA_SEG_END:
 
