@@ -10,53 +10,54 @@
 
 		push ebx           		; Save ebx
 		push edi           		; 
+		push edx                ; 
 		;------------------------
 		
 		; Show HC Base Address
-		lea bx, HCGreet  		; Address HC string
-		sub bx, offset GreetMsg ; Start of DS
-		call CODE_SELECTOR:printStrPm         ; Print HC string
-		mov ebx, BAR1      		; Gets BAR1	
+		lea dx, HCGreet  		; Address HC string
+		mov ah, 09
+		int 21h					; Print HC string
 		
 		push bx 				; Saves Low Part
 		shr ebx, 16             ; Gets Significant Part
 		push bx					; Prints Base Address
-		call CODE_SELECTOR:printWordFromStackPM
-		call CODE_SELECTOR:printWordFromStackPM		
+		call printWordFromStackRM
+		call printWordFromStackRM		
 
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
-
+		lea dx, newline 		; Address HC string
+		mov ah, 09
+		int 21h					; Print new line 
+		
 		; Work with CAPLENGTH
-		lea bx, CapLenMsg  		; Address for CapLenMsg
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print CapLenMsg
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
+		;lea dx, CapLenMsg  		; Address for CapLenMsg
+		;sub bx, offset GreetMsg ; Start of DS
+		;call printStrPm    		; Print CapLenMsg
+		;mov ebx, BAR1      		; Gets BAR1	
+		;call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
 
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
+		;pop edi           		; Recover Print Point
+		;add edi, ROWLENGTH 		; Next Row
+		;push edi                ; Save updated edi 
 		
 		; Work with HCIVERSION 
-		lea bx, HCVersion  		; Address for HCVersion
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print HCVersion
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCIVERSION ; Write HCVersion for BAR1
+		;lea bx, HCVersion  		; Address for HCVersion
+		;sub bx, offset GreetMsg ; Start of DS
+		;call printStrPm    		; Print HCVersion
+		;mov ebx, BAR1      		; Gets BAR1	
+		;call retrieveHCIVERSION ; Write HCVersion for BAR1
 		
-		pop edi           		; Recover Print Point
-		add edi, ROWLENGTH 		; Next Row
-		push edi                ; Save updated edi 
+		;pop edi           		; Recover Print Point
+		;add edi, ROWLENGTH 		; Next Row
+		;push edi                ; Save updated edi 
 		
 		; Work with HCSPARAMS 
-		lea bx, N_PORTS  		; Address for N_PORTS
-		sub bx, offset GreetMsg ; Start of DS
-		call printStrPm    		; Print N_PORTS
-		mov ebx, BAR1      		; Gets BAR1	
-		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
+		;lea bx, N_PORTS  		; Address for N_PORTS
+		;sub bx, offset GreetMsg ; Start of DS
+		;call printStrPm    		; Print N_PORTS
+		;mov ebx, BAR1      		; Gets BAR1	
+		;call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
 		
+        pop edx                 ;
         pop edi                 ;
         pop ebx                 ;
         

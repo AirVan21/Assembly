@@ -1,12 +1,12 @@
 initEHCI macro
 	
 ; =====================================================================================================
-; Temporary BAR information
+; Variables
 
-BAR2 = 0C360A000h
-BAR1 = 0C3609000h
+BARtemp dd 00h 
 
 ; =====================================================================================================
+
 
  	; Prints information about HC I/O Registers 
 	;
@@ -16,19 +16,13 @@ BAR1 = 0C3609000h
 	; ES  - contains Video Memory Selector
 	printEHCIInfo proc near
 
-		push eax 
-		
-		call CODE_SELECTOR:printEHCICapInfo             ; Capacity Registers
-		
-		mov edi, 1120                    				; New place to print  
-		
-		call CODE_SELECTOR:printEHCIOperInfo	        ; Operational Registers information	
-		
-  		pop eax 
- 	
- 	dead_loop:
+		mov [BARtemp], ebx                ;  
 
-		jmp dead_loop                    ; Stopping 
+		call printEHCICapInfo             ; Capacity Registers 
+		
+		;call printEHCIOperInfo	          ; Operational Registers information	
+		
+  		ret                               ; 
 
 	endp
 

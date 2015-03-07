@@ -49,7 +49,7 @@ initOperationalInfo macro
 		mov ebx, BAR1           ; 
 		mov eax, PeriodLBoffset ; USBSTS 
 
-		call CODE_SELECTOR:retrieveOperRegister
+		;call CODE_SELECTOR:retrieveOperRegister
 		
 		; PORTSC Register 
 		
@@ -64,7 +64,7 @@ initOperationalInfo macro
 		;mov ebx, BAR1           ; 
 		;mov eax, PORTSCoffset   ; PORTSC  
 		
-		;call CODE_SELECTOR:retrieveOperRegister
+		call CODE_SELECTOR:retrieveOperRegister
 		
 		;------------------------
 		; Out
