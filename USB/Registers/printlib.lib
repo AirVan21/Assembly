@@ -1,5 +1,13 @@
 initPrint	macro
-	
+
+; =====================================================================================================
+; Translation Table	
+
+hex_table db "0123456789ABCDEF"
+newline   db " ", 13, 10, "$"
+space     db " $"
+
+; =====================================================================================================
 
 	; Prints string while (charToPrint != '$')
 	;
@@ -32,6 +40,47 @@ initPrint	macro
 	endp
 
 	; Function, which prints Word(16-bit) from Stack 	
+	; Working in Real Mode only
+	;
+	; AX, BX are changed
+	printWordFromStackRM proc near
+
+		xor  eax, eax          ; Clear
+		pop  bx                ; Pop ret address
+		pop  ax                ; Pop print value
+		push bx                ; Push ret value
+		push dx                ; Save DX
+		push di                ; Save DI
+		push si                ; Save SI
+		push cx                ; Save CX
+		mov di, ax             ; Storage for value to print
+		mov cx, 4              ; Cycle counter
+		lea bx, hex_table      ; Load in bx char table
+		mov si, 12             ; Shift counter
+
+	cyclePWFSRM:
+		mov ax, di             ; Set default value
+		push cx                ; Save counter
+		mov cx, si             ; Shift value
+		shr ax, cl             ; Shift
+		and ax, 0Fh            ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Result to DL 
+		mov ah, 02h            ; Print char code
+		int 21h                ; 
+		sub si, 4              ;
+		pop cx                 ;
+		loop cyclePWFSRM       ;
+	
+		pop cx                 ; Restore registers
+		pop si                 ;
+		pop di                 ;
+		pop dx                 ;
+		ret                    ;
+
+	endp
+
+	; Function, which prints Word(16-bit) from Stack 	
 	; Working in Protected Mode 
 	; 
 	; ES - screen segment pointer
@@ -49,7 +98,7 @@ initPrint	macro
 		
 		mov cx, ax             ; CX - saver for original number
 		lea bx, hex_table      ; Loads hex table for translation
-		sub bx, offset greetMsg; Points to hex_table start (in PM)
+		sub bx, offset DATA_SEG_START; Points to hex_table start (in PM)
 
 		; First digit
 		shr ax, 12             ; Set alone digit
@@ -88,6 +137,39 @@ initPrint	macro
 	
 		ret                    ;
 
+	endp
+
+	; Function, which prints Byte (8-bit) from Stack
+	; Working in Real Mode only
+	; HEX - table is 
+	printByteFromStackRM proc near
+		
+		xor eax, eax           ;
+		pop bx                 ; pop 'ret' address
+		pop ax                 ; pop print value
+		push bx                ; save 'ret; address
+		push dx                ; save 
+		push di                ; save
+		mov di, ax             ; Storage for print value
+		lea bx, hex_table      ; Translation table
+	
+		shr ax, 4              ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Move result to dl
+		mov ah, 02h            ; Print char
+		int 21h                ;
+	
+		mov ax, di             ; Default value
+		and ax, 0Fh            ; Set digit alone
+		xlat                   ; Translate
+		mov dl, al             ; Move result to dl
+		mov ah, 02h            ; Print char
+		int 21h                ;
+	
+		pop di                 ; Recover
+		pop dx                 ;
+		ret                    ;
+	
 	endp
 
 endm
