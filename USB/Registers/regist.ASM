@@ -154,27 +154,27 @@ saveBARValue:
 ; Continue PCI device detour with DEVICE_STEP increase in address 
 ; 
 nextDevice:
-	and ecx, 0FFFFF800h    ; Clear all before device part
-	add ecx, DEVICE_STEP   ; Device step 
-	add ecx, CLASS_SUBCLASS; Add Displacement (Purpose Search)
-	test ecx, OUT_OF_BUS   ; First Number out of Bus Digit
-	jz search              ; Next device iteration
-	jmp outOfBARCheck      ; Out of BAR Check 
+	and ecx, 0FFFFF800h    		; Clear all before device part
+	add ecx, DEVICE_STEP   		; Device step 
+	add ecx, CLASS_SUBCLASS		; Add Displacement (Purpose Search)
+	test ecx, OUT_OF_BUS   		; First Number out of Bus Digit
+	jz search              		; Next device iteration
+	jmp outOfBARCheck      		; Out of BAR Check 
 
 ; Continue PCI device detour with FUNCTION_STEP increase in address 
 ; 		
 nextFunction:
-	add ecx, FUNCTION_STEP ; Function step
-	test ecx, OUT_OF_BUS   ; First out of Bus digit
-	jz search              ; Next function iteration
+	add ecx, FUNCTION_STEP 		; Function step
+	test ecx, OUT_OF_BUS   		; First out of Bus digit
+	jz search              		; Next function iteration
 
 outOfBARCheck:
 	
-	call set_prot_mode     ; Setting FS register for Long Addressing 
+	call set_prot_mode     		; Setting FS register for Long Addressing 
 	
 	
-	mov cx, 10            ; Counter for bar Amount
-	; Address of Possible BAR 
+	mov cx, 10            		; Counter for bar Amount
+								; Address of Possible BAR 
 	lea edx, HCBaseAddressStorage
 
 barLoop:
