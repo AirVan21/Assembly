@@ -2,6 +2,7 @@
 	include pmode.lib 
 	include ehci.lib 
 	include ehciCap.lib 
+	include ehciOper.lib 
 	searchHC segment use16
 	assume	cs:searchHC, ds:searchHC, es:searchHC
 	.386p
@@ -197,6 +198,7 @@ initPrint
 initProtectedMode
 initEHCI
 initCapacityInfo
+initOperationalInfo
 
 ; =====================================================================================================
 ; USB Devices BARs

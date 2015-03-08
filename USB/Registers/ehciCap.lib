@@ -11,6 +11,7 @@
 		push ebx           		; Save ebx
 		push edi           		; Is Used for BAR Storage 
 		push edx                ; 
+		push eax                ;
 		;------------------------
 		
 		mov edi, ebx            ; Base Address Here 
@@ -55,6 +56,7 @@
 
 		call printNewLineRM 	; Points to the new line 
 		
+        pop eax                 ; 
         pop edx                 ;
         pop edi                 ;
         pop ebx                 ;

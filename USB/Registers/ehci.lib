@@ -17,7 +17,7 @@ initEHCI macro
 
 		call printEHCICapInfo             ; Capacity Registers 
 		
-		;call printEHCIOperInfo	          ; Operational Registers information	
+		call printEHCIOperInfo	          ; Operational Registers information	
 		
   		ret                               ; 
 
