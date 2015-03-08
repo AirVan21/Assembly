@@ -9,10 +9,12 @@
 	printEHCICapInfo proc near
 
 		push ebx           		; Save ebx
-		push edi           		; 
+		push edi           		; Is Used for BAR Storage 
 		push edx                ; 
 		;------------------------
 		
+		mov edi, ebx            ; Base Address Here 
+
 		; Show HC Base Address
 		lea dx, HCGreet  		; Address HC string
 		mov ah, 09
@@ -24,38 +26,34 @@
 		call printWordFromStackRM
 		call printWordFromStackRM		
 
-		lea dx, newline 		; Address HC string
-		mov ah, 09
-		int 21h					; Print new line 
+		call printNewLineRM 	; Points to the new line 
 		
 		; Work with CAPLENGTH
-		;lea dx, CapLenMsg  		; Address for CapLenMsg
-		;sub bx, offset GreetMsg ; Start of DS
-		;call printStrPm    		; Print CapLenMsg
-		;mov ebx, BAR1      		; Gets BAR1	
-		;call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
+		lea dx, CapLenMsg  		; Address for CapLenMsg
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address 
+		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
 
-		;pop edi           		; Recover Print Point
-		;add edi, ROWLENGTH 		; Next Row
-		;push edi                ; Save updated edi 
+		call printNewLineRM 	; Points to the new line 
 		
 		; Work with HCIVERSION 
-		;lea bx, HCVersion  		; Address for HCVersion
-		;sub bx, offset GreetMsg ; Start of DS
-		;call printStrPm    		; Print HCVersion
-		;mov ebx, BAR1      		; Gets BAR1	
-		;call retrieveHCIVERSION ; Write HCVersion for BAR1
+		lea dx, HCVersion  		; Address for HCVersion
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address 		
+		call retrieveHCIVERSION ; Write HCVersion for BAR1
 		
-		;pop edi           		; Recover Print Point
-		;add edi, ROWLENGTH 		; Next Row
-		;push edi                ; Save updated edi 
-		
+		call printNewLineRM 	; Points to the new line 
+
 		; Work with HCSPARAMS 
-		;lea bx, N_PORTS  		; Address for N_PORTS
-		;sub bx, offset GreetMsg ; Start of DS
-		;call printStrPm    		; Print N_PORTS
-		;mov ebx, BAR1      		; Gets BAR1	
-		;call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
+		lea dx, N_PORTS  		; Address for N_PORTS
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address
+		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
+
+		call printNewLineRM 	; Points to the new line 
 		
         pop edx                 ;
         pop edi                 ;
@@ -68,6 +66,7 @@
 	; Retieves and prints CAPLENGTH
 	;
 	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
 	retrieveCAPLENGTH proc near
 
 		push ax			   		; Save ax
@@ -77,7 +76,7 @@
 		mov al, fs:[ebx]   		;   
 						   		; Prints CAPLENGTH
 		push ax            		; CAPLENGTH1
-		call printWordFromStackPM
+		call printWordFromStackRM
 		
 		pop ax  
  
@@ -87,6 +86,7 @@
 	; Retieves and prints EHCI Revision number 
 	;
 	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
 	retrieveHCIVERSION proc near
 		
 		push ax			   	    ; Save ax
@@ -96,7 +96,7 @@
 		mov ax, fs:[ebx]   		;   
 						   		; Prints CAPLENGTH
 		push ax            		; CAPLENGTH1
-		call printWordFromStackPM
+		call printWordFromStackRM
 		
 		pop ebx          
 		pop ax             		; Recover registers
@@ -108,6 +108,7 @@
 	; (In this case Number of ports for current HC)
 	;
 	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
 	retrieveHCSPARAMS proc near
 		
 		push ax			   	    ; Save ax
@@ -118,7 +119,7 @@
 						   		; Prints Num Of Ports 
 		and ax, 0Fh             ; Only last 4 bits are needed
 		push ax            		; 
-		call printWordFromStackPM
+		call printWordFromStackRM
 		
 		pop ebx          
 		pop ax             		; Recover registers

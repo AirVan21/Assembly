@@ -171,8 +171,22 @@ outOfBARCheck:
 	
 	call set_prot_mode     ; Setting FS register for Long Addressing 
 	
-	mov ebx, dword ptr [HCBaseAddressStorage] 
-	call printEHCIInfo     ;  
+	
+	mov cx, 10            ; Counter for bar Amount
+	; Address of Possible BAR 
+	lea edx, HCBaseAddressStorage
+
+barLoop:
+	mov ebx, dword ptr [edx]	; Gets address
+	cmp ebx, 0                  ; If Valid Base Address
+	jz outOfBarLoop             ; Out in not Valid
+	call printEHCIInfo          ; Print Info For Valid
+	add edx, 4                  ; Mov to the next 
+	call printNewLineRM          
+	
+	loop barLoop
+
+outOfBarLoop:
 
 	int 20h 	
 

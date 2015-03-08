@@ -172,4 +172,20 @@ space     db " $"
 	
 	endp
 
+	printNewLineRM proc near
+
+		push ax 				; Save Registers 
+		push dx 
+
+		mov ah, 09h             ; Print String Function 
+		lea dx, newline         ; DX - address of new line string 
+		int 21h                 ; MS-DOS call 
+
+		pop dx 					; Recover Registers
+		pop ax 
+
+		ret
+
+	endp
+
 endm

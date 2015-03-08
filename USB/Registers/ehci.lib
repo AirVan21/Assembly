@@ -3,7 +3,6 @@ initEHCI macro
 ; =====================================================================================================
 ; Variables
 
-BARtemp dd 00h 
 
 ; =====================================================================================================
 
@@ -14,9 +13,7 @@ BARtemp dd 00h
 	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
 	; FS  - contains Selector For Zero Memory
 	; ES  - contains Video Memory Selector
-	printEHCIInfo proc near
-
-		mov [BARtemp], ebx                ;  
+	printEHCIInfo proc near  
 
 		call printEHCICapInfo             ; Capacity Registers 
 		
