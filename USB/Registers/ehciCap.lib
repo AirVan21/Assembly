@@ -78,6 +78,7 @@
 		mov al, fs:[ebx]   		;   
 						   		; Prints CAPLENGTH
 		push ax            		; CAPLENGTH1
+		mov OperRegOff, ax      ; 
 		call printWordFromStackRM
 		
 		pop ax  

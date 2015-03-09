@@ -96,9 +96,13 @@ PORTSCOffset   = 44h
 		
 		push ebx           		; Save ebx 
 		push eax			   	; Save eax
+		push ecx                ;
+
+		xor ecx, ecx            ;
 		
 		add ebx, eax            ; 
-		add ebx, 020h           ; Offset for Operational registers
+		mov cx, OperRegOff      ; Get Offset For Operational Registers 
+		add ebx, ecx           	; Add Offset for Operational registers
 
 		mov eax, fs:[ebx]       ; Getting USBCMD
 		push ax                 ; Print USBCMD
@@ -107,6 +111,7 @@ PORTSCOffset   = 44h
 		call printWordFromStackRM
 		call printWordFromStackRM
 		
+		pop ecx                  ; Recover Registers
 		pop eax             	;
 		pop ebx                 ;
 		
