@@ -1,5 +1,24 @@
 initOperationalInfo macro
 
+ 	
+; =====================================================================================================
+; Operational registers
+
+USBCMDoffset   = 00h
+USBSTSoffset   = 04h
+PeriodLBoffset = 14h
+PORTSCOffset   = 44h
+
+
+; =====================================================================================================
+
+
+USBCMDReg dw 0h 
+USBSTSReg dw 0h 
+
+
+; =====================================================================================================
+
  	; Prints information about HC Operational I/O Registers 
 	;
 	; EBX - contains BAR address
@@ -10,65 +29,66 @@ initOperationalInfo macro
 
 		push ebx           		 ; Save 
 		push eax           		 ; 
+		push edx                 ;
 		push edi                 ; 
 		;------------------------
 		
+		mov edi, ebx 			; Save 
+		
 		; USB CMD
-		lea bx, USBCMDmsg       ; Address for Message
-		sub bx, offset GreetMsg ; Start of DS
-		call CODE_SELECTOR:printStrPm         ; Print 
+		lea dx, USBCMDmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-		mov ebx, BAR1           ; 
 		mov eax, USBCMDoffset   ; USBCMD 
 
-		call CODE_SELECTOR:retrieveOperRegister
+		call retrieveOperRegister; Prints USB CMD Register 
+
+		call printNewLineRM     ; Prints New Line 
 
 		; USB STS 
-		pop edi                 ; Next Row 
-		add edi, ROWLENGTH      ; 
-		push edi                ; 
-		
-		lea bx, USBSTSmsg       ; Address for Message
-		sub bx, offset GreetMsg ; Start of DS
-		call CODE_SELECTOR:printStrPm    	; Print 
+		lea dx, USBSTSmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-		mov ebx, BAR1           ; 
+		mov ebx, edi            ; Base Address 
 		mov eax, USBSTSoffset   ; USBSTS 
 
-		call retrieveOperRegister
+		call retrieveOperRegister ; Print USB STS
 
-		; Period List Base 
-		pop edi                 ; Next Row 
-		add edi, ROWLENGTH      ; 
-		push edi                ; 
+		call printNewLineRM     ; Prints New Line 
+
+		;Period List Base 
 		
-		lea bx, PListBase       ; Address for Message
-		sub bx, offset GreetMsg ; Start of DS
-		call CODE_SELECTOR:printStrPm    		; Print 
+		lea dx, PListBase       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-		mov ebx, BAR1           ; 
+		mov ebx, edi            ;  
 		mov eax, PeriodLBoffset ; USBSTS 
 
-		call CODE_SELECTOR:retrieveOperRegister
+		call retrieveOperRegister; Print Period Base
 		
+		call printNewLineRM     ; Prints New Line 
+
 		; PORTSC Register 
 		
-		;pop edi                 ; Next Row 
-		;add edi, ROWLENGTH      ; 
-		;push edi                ; 
-		
-		;lea bx, PORTSCMsg       ; Address for Message
-		;sub bx, offset GreetMsg ; Start of DS
-		;call CODE_SELECTOR:printStrPm    ; Print 
+		lea dx, PORTSCMsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-		;mov ebx, BAR1           ; 
-		;mov eax, PORTSCoffset   ; PORTSC  
+		mov ebx, edi            ; 
+		mov eax, PORTSCoffset   ; PORTSC offset 
 		
-		;call CODE_SELECTOR:retrieveOperRegister
+		call retrieveOperRegister; Print Period Base
 		
+		call printNewLineRM     ; Prints New Line 
+
 		;------------------------
 		; Out
+		
 		pop edi 
+		pop edx                  ; 
 		pop eax                  ; Recover edi
 		pop ebx            		 ; Recover ebx 
 
@@ -84,17 +104,22 @@ initOperationalInfo macro
 		
 		push ebx           		; Save ebx 
 		push eax			   	; Save eax
+		push ecx                ;
+
+		xor ecx, ecx            ;
 		
 		add ebx, eax            ; 
-		add ebx, 020h           ; Offset for Operational registers
+		mov cx, OperRegOff      ; Get Offset For Operational Registers 
+		add ebx, ecx           	; Add Offset for Operational registers
 
 		mov eax, fs:[ebx]       ; Getting USBCMD
-
 		push ax                 ; Print USBCMD
 		shr eax, 16             ;
-		push ax                 ;
-		call CODE_SELECTOR:printWordFromStackPM
-		call CODE_SELECTOR:printWordFromStackPM
+		push ax              	;
+		call printWordFromStackRM
+		call printWordFromStackRM
+		
+		pop ecx                  ; Recover Registers
 		pop eax             	;
 		pop ebx                 ;
 		

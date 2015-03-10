@@ -16,42 +16,143 @@ qTDBuffer  =  00900000h
 
 	; Extra function Processing start 
 	; 
-	;
-	introInMessaging:
+	; EBX - contains Base Address 
+	introInMessaging proc 
 		
-		push eax
+		push eax				; Save Registers 
 		push ebx
 		push edx 
+		push edi 
 		
-		jmp CODE_SELECTOR:createMessageSequence
-
-	outInit:
-
-		mov edi, 160
+		mov edi, ebx            ; Save Base Address
+		xor edx, edx            ; 
 
 		
-		lea bx, USBSTSmsg       ; Address for Message
-		sub bx, offset GreetMsg ; Start of DS
-		call CODE_SELECTOR:printStrPm    	; Print 
+		; USB CMD
+		lea dx, USBCMDmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-		mov ebx, BAR1           ; 
-		mov eax, USBSTSoffset   ; USBCMD 
+		mov eax, USBCMDoffset   ; USBCMD 
+
+		call retrieveOperRegister; Prints USB CMD Register 
+
+		call printNewLineRM     ; Prints New Line 
+
+		; USB STS 
+		lea dx, USBSTSmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
+
+		mov ebx, edi            ; Base Address 
+		mov eax, USBSTSoffset   ; USBSTS 
+
+		call retrieveOperRegister ; Print USB STS
+
+		call printNewLineRM     ; Prints New Line 
+		call printNewLineRM     ; Prints New Line
 		
-		call retrieveOperRegister
+		call stopHCinCMD        ; Clear Run/Stop bit in USBCMD 
 
+		; USB CMD
+		mov ebx, edi            ; Base Address 
 		
+		lea dx, USBCMDmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
 
-	dead_loop:
+		mov eax, USBCMDoffset   ; USBCMD 
 
-		jmp dead_loop
+		call retrieveOperRegister; Prints USB CMD Register 
 
+		call printNewLineRM     ; Prints New Line
+
+		; USB STS 
+		lea dx, USBSTSmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
+
+		mov ebx, edi            ; Base Address 
+		mov eax, USBSTSoffset   ; USBSTS 
+
+		call retrieveOperRegister ; Print USB STS
+
+		call printNewLineRM     ; Prints New Line
+		call printNewLineRM     ; Prints New Line
+
+		mov ebx, edi            ; Base Address 
+
+		call runHCinCMD        ; Clear Run/Stop bit in USBCMD 
+
+		; USB CMD
+		mov ebx, edi            ; Base Address 
+		
+		lea dx, USBCMDmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
+
+		mov eax, USBCMDoffset   ; USBCMD 
+
+		call retrieveOperRegister; Prints USB CMD Register 
+
+		call printNewLineRM     ; Prints New Line
+
+		; USB STS 
+		lea dx, USBSTSmsg       ; Address for Message
+		mov ah, 09h             ; Print Function
+		int 21h
+
+		mov ebx, edi            ; Base Address 
+		mov eax, USBSTSoffset   ; USBSTS 
+
+		call retrieveOperRegister ; Print USB STS
+
+		call printNewLineRM     ; Prints New Line
+		
+		;call printNewLineRM
+
+		;mov eax, 00080010h      ; Default USBCMD value (with enables ASYNCH Queue)
+		
+		;mov fs:[ebx], eax       ;             
+
+		;mov ebx, fs:[ebx]       ; 
+		
+		;push bx
+		;shr ebx, 16
+		;push bx
+		;call printWordFromStackRM
+		;call printWordFromStackRM 
+		
+		;mov edi, ebx            ; 
+		
+		;mov fs:[ebx], edx       ;             
+
+		;call createMessageSequence
+		
+		;call initListBase 
+		
+		
+		; Configuration information 
+
+		;mov ebx, BAR1           ; 
+		;mov eax, USBSTSoffset   ; USBCMD 
+		;call retrieveOperRegister
+	
+		pop edi
+		pop edx 
+		pop ebx
+		pop eax 
+
+		ret
+
+	endp     
 
 
 	; Setup Queue Head Handle a Control Traffiic
 	;
 	; DS - data segment   pointer
 	; ES - screen segment pointer
-	; DI - offset for printing string in Video Mem
+	; DI 	- offset for printing string in Video Mem
 	createMessageSequence:
 
 		;===============================
@@ -124,7 +225,76 @@ qTDBuffer  =  00900000h
 		pop ebx
 		pop eax 
 		
-		jmp CODE_SELECTOR:initListBase          
+		ret           
+
+	; Sets USBCMD (Run/Stop) zero-bit to ZERO  
+	; Wait for 16 microframes   
+	; 
+	; EBX - contains Base Address 
+	stopHCinCMD proc
+
+		push edx						; Save Register
+		push ebx 						; 
+		push cx                         ;
+
+		xor edx, edx                    
+
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Base Address 
+
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		and edx, 0fffffffeh             ; Clears Run/Stop bit 
+		mov fs:[ebx], edx               ; Set updated value 
+
+										; Wait till apply 
+		mov cx, 040h 					; 64 iterations
+	wait16Microframes:
+		loop wait16Microframes
+
+		pop cx  						; Recover Register 
+		pop ebx 						;
+		pop edx 						; 
+
+		ret 
+	
+	endp 
+
+	; Sets USBCMD (Run/Stop) zero-bit to ONE  
+	; Software shouldn't write USBCMD (Run/Stop) until USBSTS (HCHalted) bit is one    
+	; 
+	; EBX - contains Base Address 
+	runHCinCMD proc
+
+		push edx						; Save Register
+		push ebx 						; 
+		push cx							;
+		xor edx, edx                    
+
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Address
+
+		
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		or edx, 1h             			; Sets to one Run/Stop bit 
+		mov fs:[ebx], edx               ; Set updated value 
+
+		add ebx, USBSTSoffset			; USB STS Address 
+
+		; Under Question! (USB STS BLOCKING FACTOR)
+
+	  waitHCHaltedBit:               
+		mov eax, fs:[ebx]				; Get USBSTS value 
+		test eax, 00001000h             ; Checking 12-th bit 
+		jnz waitHCHaltedBit             ; Wait Until HCHalted is Set   
+
+		pop cx 							;
+		pop ebx 						; Recover Register 
+		pop edx 						; 
+
+		ret 
+	
+	endp 
+
 
 	; Init Periodic List Base
 	;	
@@ -150,8 +320,6 @@ qTDBuffer  =  00900000h
 		pop ebx                         ; Recover 
 		pop eax 
 
-		jmp CODE_SELECTOR:outInit
-
-
+		ret                             ; 
 
 endm
