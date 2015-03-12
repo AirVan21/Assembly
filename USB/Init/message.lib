@@ -3,21 +3,19 @@ messageLib macro
 ; =====================================================================================================
 ; Temporary BAR information
 
-BAR1 = 0C360A000h
-BAR2 = 0C3609000h
-
 
 qTDOffset   = 40h 
 qBuffOffset = 00008000h
 
 QHInMem    =  00A00000h
 qTDfirst   =  00A00100h
-qTDBuffer  =  00900000h
+qTDBufferR =  00900000h
+qTDBufferW =  00800000h
 
 	; Extra function Processing start 
 	; 
 	; EBX - contains Base Address 
-	introInMessaging proc 
+	introInMessaging:
 		
 		push eax				; Save Registers 
 		push ebx
@@ -26,126 +24,19 @@ qTDBuffer  =  00900000h
 		
 		mov edi, ebx            ; Save Base Address
 		xor edx, edx            ; 
-
+	
 		
-		; USB CMD
-		lea dx, USBCMDmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov eax, USBCMDoffset   ; USBCMD 
-
-		call retrieveOperRegister; Prints USB CMD Register 
-
-		call printNewLineRM     ; Prints New Line 
-
-		; USB STS 
-		lea dx, USBSTSmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ; Base Address 
-		mov eax, USBSTSoffset   ; USBSTS 
-
-		call retrieveOperRegister ; Print USB STS
-
-		call printNewLineRM     ; Prints New Line 
-		call printNewLineRM     ; Prints New Line
+		call initListBase 
 		
-		call stopHCinCMD        ; Clear Run/Stop bit in USBCMD 
-
-		; USB CMD
-		mov ebx, edi            ; Base Address 
-		
-		lea dx, USBCMDmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov eax, USBCMDoffset   ; USBCMD 
-
-		call retrieveOperRegister; Prints USB CMD Register 
-
-		call printNewLineRM     ; Prints New Line
-
-		; USB STS 
-		lea dx, USBSTSmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ; Base Address 
-		mov eax, USBSTSoffset   ; USBSTS 
-
-		call retrieveOperRegister ; Print USB STS
-
-		call printNewLineRM     ; Prints New Line
-		call printNewLineRM     ; Prints New Line
-
-		mov ebx, edi            ; Base Address 
-
-		call runHCinCMD        ; Clear Run/Stop bit in USBCMD 
-
-		; USB CMD
-		mov ebx, edi            ; Base Address 
-		
-		lea dx, USBCMDmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov eax, USBCMDoffset   ; USBCMD 
-
-		call retrieveOperRegister; Prints USB CMD Register 
-
-		call printNewLineRM     ; Prints New Line
-
-		; USB STS 
-		lea dx, USBSTSmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ; Base Address 
-		mov eax, USBSTSoffset   ; USBSTS 
-
-		call retrieveOperRegister ; Print USB STS
-
-		call printNewLineRM     ; Prints New Line
-		
-		;call printNewLineRM
-
-		;mov eax, 00080010h      ; Default USBCMD value (with enables ASYNCH Queue)
-		
-		;mov fs:[ebx], eax       ;             
-
-		;mov ebx, fs:[ebx]       ; 
-		
-		;push bx
-		;shr ebx, 16
-		;push bx
-		;call printWordFromStackRM
-		;call printWordFromStackRM 
-		
-		;mov edi, ebx            ; 
-		
-		;mov fs:[ebx], edx       ;             
-
 		;call createMessageSequence
 		
-		;call initListBase 
-		
-		
-		; Configuration information 
-
-		;mov ebx, BAR1           ; 
-		;mov eax, USBSTSoffset   ; USBCMD 
-		;call retrieveOperRegister
 	
 		pop edi
 		pop edx 
 		pop ebx
 		pop eax 
 
-		ret
-
-	endp     
+		db 0C3h                			; ret  
 
 
 	; Setup Queue Head Handle a Control Traffiic
@@ -162,70 +53,110 @@ qTDBuffer  =  00900000h
 		push ebx                        ; 
 		push edx                        ; Will be used as a mem pointer
 
+
 		; QH Horizontal Link Pointer
-		mov eax, QHInMem                ; Pointer to the next Queue, which should be processed
-		mov fs:[eax], 00A00002h         ; 2-nd bit shows that this is QH
+		;mov eax, QHInMem                ; Pointer to the next Queue, which should be processed
+		;mov ebx, 00A00002h				;
+		;mov fs:[eax], ebx        		; 2-nd bit shows that this is QH
 
 		; Endpoint characteristics 
-		add eax, 4                      ;
-		mov fs:[eax], 0040D000h         ; 40 - max packet size; Low Speed Device Indication
+		;add eax, 4                      ;
+		;mov ebx, 0040D000h				;
+		;mov fs:[eax], ebx    		    ; 40 - max packet size; Low Speed Device Indication
 
 		; Transaction information
-		add eax, 4 
-		mov fs:[eax], 40000000h         ; One transaction per microframe
+		;add eax, 4 
+		;mov ebx, 40000000h
+		;mov fs:[eax], ebx 		        ; One transaction per microframe
 
 		; Current qTD
-		add eax, 4                      ; Set as Zerp
-		xor ebx, ebx 
-		mov fs:[eax], ebx               ;
+		;add eax, 4                      ; Set as Zero 
+		;xor ebx, ebx 
+		;mov fs:[eax], ebx               ;
 
 		; Next qTD
-		add eax, 4 
-		mov ebx, qTDfirst               ; Pointer to first qTD to process                        
-		mov fs:[eax], ebx               ;
+		;add eax, 4 
+		;mov ebx, qTDfirst               ; Pointer to first qTD to process                        
+		;mov fs:[eax], ebx               ;
 
 		;===============================
-		; Constructing qTD
+		; Constructing Setup qTD
 		
 		; Next qTD pointer 
-		mov eax, qTDfirst               ; Address of first qTD 
-		mov edx, eax                    ; 
-		add edx, qTDOffset              ; Points to the next qTD 
-		mov fs:[eax], edx               ; Puts pointer in qTD 
+		;mov eax, qTDfirst               ; Address of first qTD 
+		;mov edx, eax                    ; 
+		;add edx, qTDOffset              ; Points to the next qTD 
+		;mov fs:[eax], edx               ; Puts pointer in qTD 
 
 		; Alternative qTD  
-		mov edx, eax                    ;
-		add edx, 4                      ; Next field
-		xor eax, eax                    ;
-		mov fs:[edx], eax               ; Alternative qTD = 0h 
+		;mov edx, eax                    ;
+		;add edx, 4                      ; Next field
+		;xor eax, eax                    ;
+		;mov fs:[edx], eax               ; Alternative qTD = 0h 
 
 		; qTD token                    
-		add edx, 4                      ; 
-		mov eax, 00080E80h              ; Setting Setup PID | 8 byte Payload
-		mov fs:[edx], eax               ; 
+		;add edx, 4                      ; 
+		;mov eax, 00080E80h              ; Setting Setup PID | 8 byte Payload
+		;mov fs:[edx], eax               ; 
 
 		; qTD Buffer Pointer list
 		; 4Kbyte aligned 
-		add edx, 4                      ;
-		mov eax, qTDBuffer              ; Payload Pointer 
-		mov fs:[edx], eax               ; 
+		;add edx, 4                      ;
+		;mov eax, qTDBufferR             ; Payload Pointer 
+		;mov fs:[edx], eax               ; 
 
 		; Write Payload (8 byte)
-		mov eax, qTDBuffer              ;
-		mov ebx, 80060001h              ; GET_DESCRIPTOR (Device)
-		mov fs:[eax], ebx               ;
-		add eax, 4                      ;
-		mov ebx, 00004000h              ; Length of Descriptor 
-		mov fs:[eax], ebx               ;
+		;mov eax, qTDBufferR             ;
+		;mov ebx, 80060001h              ; GET_DESCRIPTOR (Device)
+		;mov fs:[eax], ebx               ;
+		;add eax, 4                      ;
+		;mov ebx, 00004000h              ; Length of Descriptor 
+		;mov fs:[eax], ebx               ;
 
 		;===============================
-		; 
+		; Constructing In qTD
+
+		;mov eax, qTDfirst
+		;mov edx, qTDOffset
+		;add eax, edx					; Points to IN qTD
+
+		;xor ebx, ebx 					; 
+		;add edx, qTDOffset				; qTD after IN 
+		;mov fs:[eax], edx				; Next qTD pointer
 		
+		;add eax, 04h 					;
+		;mov fs:[eax], ebx 				; ZERO field 
+		
+		;add eax, 04h 					;
+		;mov ebx, 80400D80h 				; [31] = 1 In Packet; [14:10] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
+										; [30:16] = 0x40 bytes to transfer 
+		;add eax, 04h 					;
+		;mov ebx, qTDBufferW				; Address of Buffer to Write
+
+		;===============================
+		; Constructing Out qTD
+
+		;mov eax, edx 					; Points to OUT qTD 
+		;mov ebx, 0DEAD0001h				; Last Packet 
+		;mov fs:[eax], ebx 				; Last Packet
+
+		;xor ebx, ebx 					;
+		;add eax, 04h 					; 
+		;mov fs:[eax], ebx 				; ZERO field
+
+		;add eax, 04h 					; 
+		;mov ebx, 80008C80h				; [30:16] - Zero Length, [9:8] OUT PID 
+		;mov fs:[eax], ebx 				; Write OUT packet 
+
+		;xor ebx, ebx 					; Empty Buffer Pointer 
+		;add eax, 04h 					;
+		;mov fs:[eax], ebx 				; 
+
 		pop edx
 		pop ebx
 		pop eax 
 		
-		ret           
+		db 0C3h                			; ret 
 
 	; Sets USBCMD (Run/Stop) zero-bit to ZERO  
 	; Wait for 16 microframes   
@@ -268,6 +199,7 @@ qTDBuffer  =  00900000h
 		push edx						; Save Register
 		push ebx 						; 
 		push cx							;
+		
 		xor edx, edx                    
 
 		mov dx, OperRegOff				; Offset for Operational Register
@@ -298,28 +230,25 @@ qTDBuffer  =  00900000h
 
 	; Init Periodic List Base
 	;	
+	; EBX - contains Base Address 
 	initListBase:
 
 		push eax                        ; Saves eax
 		push ebx                        ; 
 		push edx   
 
-		mov edx, BAR1                   ;
-		add edx, 20h                   	;
-		mov fs:[edx], 00080010h         ; Default USB CMD value (with AsyncSchedule)
+		xor eax, eax 					; 
 
-		add edx, PeriodLBoffset         ; 
-		mov eax, QHInMem                ;
-		mov fs:[edx], eax               ; Set ListBase Register to QH 
+		mov edx, qTDBufferW 			; Address of Write Buffer (Data from function)
+		mov fs:[edx], eax 				; 
 
-		mov edx, BAR1            		;
-		add edx, 20h                   	;
-		mov fs:[edx], 00080011h         ; Default USB CMD value (with AsyncSchedule)
-
+		mov eax, AsуnchLBoffset 		;
+		call retrieveOperRegister		; Print AsуnchListBase 
+		
 		pop edx 
 		pop ebx                         ; Recover 
 		pop eax 
 
-		ret                             ; 
+		db 0C3h                			; ret 
 
 endm
