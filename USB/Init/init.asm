@@ -1,6 +1,7 @@
 	include printlib.lib 
 	include pmode.lib 
-	include ehci.lib 
+	include ehci.lib
+	include ehciCap.lib  
 	include ehciOper.lib 
 	include message.lib
 	searchHC segment use16
@@ -86,6 +87,8 @@ processUSBHC:
 	push dx                ;
 	push si                ;
 	
+	call savePCIAddress		; Save HCs PCI Address 
+	
 	sub cx, CLASS_SUBCLASS ; Cuz ECX firstly for CLASS retriving 
 	add cx, BAR0           ; First BAR offset
 	mov esi, ecx           ; Address for PCI device
@@ -103,7 +106,7 @@ processUSBHC:
 	jz nextbar             ; Jump to next bar 
 	
 	call saveBARValue		; Saves Base Address
-           
+	       
    nextbar:	
 
 	loop cycbar            ; loop it
@@ -131,17 +134,17 @@ saveBARValue:
 
 	mov cx, 10              ; Amount of Possible BAR (to save)
 
-  storageCycle:
+  storageCycleBA:
 	
 	mov eax, dword ptr [ebx]; Get BAR from storage 
 	cmp eax, 0              ; If Empty then Write In Mem 
 	jz writeBarToStorrage   ;
 	add ebx, 4              ; Mov to the next place 
 
-	loop storageCycle       ;
-  
+	loop storageCycleBA
+
   writeBarToStorrage:
-	
+
 	pop eax                 ; Get Base Address
 	mov [ebx], eax          ; Save BA in Memory 
 	
@@ -149,7 +152,44 @@ saveBARValue:
 	pop ebx                 ; Recover registers
 	pop eax                 ; 
 
-	db 0C3h                ; ret               
+	db 0C3h                 ; ret
+
+; Saves HCs PCI Address For Future Processing
+; 
+; ECX - Contains PCI Address
+savePCIAddress:
+	
+	push eax 				; Save registers
+	push ebx                ; 
+	push ecx                ;
+
+	push ecx                ; Store PCI Address (which should be stored)
+	
+	; Saves Base Address to Storage
+	lea ebx, HCPCIAddressStorage
+
+	mov cx, 10              ; Amount of Possible Addresses (to save)
+
+  storageCyclePA:
+	
+	mov eax, dword ptr [ebx]; Get BAR from storage 
+	cmp eax, 0              ; If Empty then Write In Mem 
+	jz writePciToStorrage   ;
+	add ebx, 4              ; Mov to the next place 
+
+	loop storageCyclePA     ;
+  
+  writePciToStorrage:
+	
+	pop eax                 ; Get PCI Address
+	sub eax, CLASS_SUBCLASS	; Default PCI Address
+	mov [ebx], eax          ; Save Address in Memory 
+	
+	pop ecx                 ;   
+	pop ebx                 ; Recover registers
+	pop eax                 ; 
+
+	db 0C3h                ; ret                 
 
 ; Continue PCI device detour with DEVICE_STEP increase in address 
 ; 
@@ -175,18 +215,28 @@ outOfBARCheck:
 	mov cx, 10            		; Counter for bar Amount
 								; Address of Possible BAR 
 	lea edx, HCBaseAddressStorage
+	lea esi, HCPCIAddressStorage
 
-;barLoop:
+barLoop:
 
-	mov ebx, dword ptr [edx]	; Gets address
+	mov ebx, dword ptr [edx]	; Gets Base address
+	mov eax, dword ptr [esi]	; Gets PCI address 
+	mov HCPCIAddress, eax 		; Write PCI address 
 	cmp ebx, 0                  ; If Valid Base Address
 	jz outOfBarLoop             ; Out in not Valid
 	;call printPORTSCinfo		; 
-	call introInMessaging       ; 
-	add edx, 4                  ; Mov to the next 
+	;call introInMessaging       ; 
+	;call printEHCIOperInfo
+	call retrieveLegacyInterruptsEHCI 
+	call printUSBIntMonitor
+	call takeEHCIOwnership
+	call printNewLineRM
+	call printUSBIntMonitor
+	add edx, 4                  ; Mov to the next Base Address
+	add esi, 4					; MOv to the next PCI 
 	call printNewLineRM          
 	
-;	loop barLoop
+	loop barLoop
 
 outOfBarLoop:
 
@@ -200,11 +250,25 @@ initProtectedMode
 initEHCI
 initOperationalInfo
 messageLib
+initCapacityInfo
 
 ; =====================================================================================================
 ; USB Devices BARs
 
 HCBaseAddressStorage:
+
+	dw 0h 	; #1 
+	dw 0h 	; #2
+	dw 0h 	; #3
+	dw 0h 	; #4
+	dw 0h 	; #5
+	dw 0h 	; #6
+	dw 0h 	; #7
+	dw 0h 	; #8
+	dw 0h 	; #9
+	dw 0h 	; #10 
+
+HCPCIAddressStorage:
 
 	dw 0h 	; #1 
 	dw 0h 	; #2

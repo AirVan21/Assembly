@@ -1,0 +1,167 @@
+initEHCI macro
+	
+; =====================================================================================================
+; Variables
+
+EECPvalue			dw 0h 	
+
+OperRegOff 			dw 20h
+HCPCIAddress 		dd 0h
+USBLEGSUPReg		dd 0h
+USBLEGCTLSTSReg 	dd 0h
+
+; =====================================================================================================
+; CONSTS 
+
+USBLEGSUPoffset 	 = 00h 
+USBLEGCTLSTSoffset   = 04h 
+
+USBLEGSUPmsg 	 db "USBLEGSUP  Register = $"
+USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
+
+
+; =====================================================================================================
+
+ 	; Prints information about HC I/O Registers 
+	;
+	; EBX - contains BAR address | Or Not 
+	; FS  - contains Selector For Zero Memory
+	printEHCIInfo proc near  
+
+		; Include code for Operational Registers Displacement CalCulation 
+		
+		call printEHCIOperInfo	          ; Operational Registers information	
+		
+  		
+  		ret                               ; 
+
+	endp
+
+	; Retrieves Legacy Support Registers 
+	;
+	; EAX - contains PCI Address | Or from HCPCIAddress Variable
+	; EBX - contains Base Address
+	retrieveLegacyInterruptsEHCI proc near
+
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------;
+
+		mov eax, HCPCIAddress	 ; PCI Address in eax 
+
+		add ebx, HCCPARAMSoffset ; Points on HCCPARAMS Capacity Register 
+		mov edx, fs:[ebx]		 ; HCCPARAMS Register	
+		and edx, 0000FFFFh		 ; Zero First Part 
+		shr edx, 8				 ; Lonely EECP Value 
+
+		mov dx, EECPvalue		 ; Save EECP Value 
+
+		mov ebx, edx 			 ; Copy EECP
+
+		add eax, edx			 ; OUT command for USBLEGSUPReg
+ 		add eax, USBLEGSUPoffset ; 
+ 		mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		in  eax, dx				 ; Sets data from PCI device
+		mov USBLEGSUPReg, eax 	 ; 
+
+		mov eax, HCPCIAddress	 ; PCI Address in eax 
+		add eax, ebx			 ; OUT command for USBLEGSUPReg
+ 		add eax, USBLEGCTLSTSoffset
+ 		mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		in  eax, dx				 ; Sets data from PCI device
+		mov USBLEGCTLSTSReg, eax ; 
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+	
+	endp
+
+	; Prints Info From Legacy Registers 
+	; 
+	; EBX - contains Base Address 
+	printUSBIntMonitor proc near
+		
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------; 
+
+		lea dx, USBLEGSUPmsg     ; USBLEGSUP Register 
+		mov ah, 09h 			 ;
+		int 21h 
+		
+		mov eax, USBLEGSUPReg	 ; Prints USBLEGSUP Register 
+		push ax
+		shr eax, 16  
+		push ax 
+		call printWordFromStackRM
+		call printWordFromStackRM	
+
+		call printNewLineRM
+
+		lea dx, USBLEGCTLSmsg    ; USBLEGSUP Register 
+		mov ah, 09h 			 ;
+		int 21h 
+
+		mov eax, USBLEGCTLSTSReg ; Prints USBLEGCTLSTS Register 
+		push ax
+		shr eax, 16  
+		push ax 
+		call printWordFromStackRM
+		call printWordFromStackRM	
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+
+	endp
+
+	; Sets HC OS ownership bit to one 
+	; Waits until HC BIOS ownership bit is zero 
+	; 
+	; 
+	takeEHCIOwnership proc near 
+		
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------; 		
+		
+		xor ebx, ebx
+
+		mov eax, HCPCIAddress    ; PCI Address
+		mov bx, EECPvalue        ; Offset from PARAMS Register
+		add eax, ebx 			 ; 
+
+ 		add eax, USBLEGSUPoffset ; 
+ 		mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		mov eax, USBLEGSUPReg	 ; Legacy Support Register
+		or eax, 01000000h 		 ; Sets OS Owned bit 
+		out dx, eax				 ; Sets data to PCI device
+		mov USBLEGSUPReg, eax 	 ; 
+		
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+	
+	endp
+
+endm

@@ -1,0 +1,144 @@
+ initCapacityInfo macro
+
+; =====================================================================================================
+
+HCIVERSIONoffset	= 02h
+HCSPARAMSoffset		= 04h
+HCCPARAMSoffset 	= 08h
+
+
+; =====================================================================================================
+
+
+ 	; Prints information about HC Capacity I/O Registers 
+	;
+	; EBX - contains BAR address
+	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
+	; FS  - contains Selector For Zero Memory
+	; ES  - contains Video Memory Selector
+	printEHCICapInfo proc near
+
+		push ebx           		; Save ebx
+		push edi           		; Is Used for BAR Storage 
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		mov edi, ebx            ; Base Address Here 
+
+		; Show HC Base Address
+		lea dx, HCGreet  		; Address HC string
+		mov ah, 09
+		int 21h					; Print HC string
+		
+		push bx 				; Saves Low Part
+		shr ebx, 16             ; Gets Significant Part
+		push bx					; Prints Base Address
+		call printWordFromStackRM
+		call printWordFromStackRM		
+
+		call printNewLineRM 	; Points to the new line 
+		
+		; Work with CAPLENGTH
+		lea dx, CapLenMsg  		; Address for CapLenMsg
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address 
+		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
+
+		call printNewLineRM 	; Points to the new line 
+		
+		; Work with HCIVERSION 
+		lea dx, HCVersion  		; Address for HCVersion
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address 		
+		call retrieveHCIVERSION ; Write HCVersion for BAR1
+		
+		call printNewLineRM 	; Points to the new line 
+
+		; Work with HCSPARAMS 
+		lea dx, N_PORTS  		; Address for N_PORTS
+		mov ah, 09h             ; Print string function
+		int 21h                 ;
+		mov ebx, edi            ; Base Address
+		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
+
+		call printNewLineRM 	; Points to the new line 
+		
+        pop eax                 ; 
+        pop edx                 ;
+        pop edi                 ;
+        pop ebx                 ;
+        
+        ret
+
+    endp
+	
+	; Retieves and prints CAPLENGTH
+	;
+	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
+	retrieveCAPLENGTH proc near
+
+		push ax			   		; Save ax
+		
+		xor ax, ax              ;
+
+		mov al, fs:[ebx]   		;   
+						   		; Prints CAPLENGTH
+		push ax            		; CAPLENGTH1
+		mov OperRegOff, ax      ; 
+		call printWordFromStackRM
+		
+		pop ax  
+ 
+		ret
+	endp
+
+	; Retieves and prints EHCI Revision number 
+	;
+	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
+	retrieveHCIVERSION proc near
+		
+		push ax			   	    ; Save ax
+		push ebx           		; Save ebx 
+		
+		add ebx, 2         		; Offset for HCIVersion 
+		mov ax, fs:[ebx]   		;   
+						   		; Prints CAPLENGTH
+		push ax            		; CAPLENGTH1
+		call printWordFromStackRM
+		
+		pop ebx          
+		pop ax             		; Recover registers
+ 		
+		ret
+	endp
+
+	; Retieves and prints EHCI HCSPARAMS register 
+	; (In this case Number of ports for current HC)
+	;
+	; EBX - contains Base Address (BAR)
+	; FS  - is used for Addressing 
+	retrieveHCSPARAMS proc near
+		
+		push ax			   	    ; Save ax
+		push ebx           		; Save ebx 
+		
+		add ebx, 4         		; Offset for HCSPARAMS 
+		mov eax, dword ptr fs:[ebx]  ;   
+						   		; Prints Num Of Ports 
+		and ax, 0Fh             ; Only last 4 bits are needed
+		push ax            		; 
+		call printWordFromStackRM
+		
+		pop ebx          
+		pop ax             		; Recover registers
+ 		
+		ret
+	
+	endp
+
+endm
