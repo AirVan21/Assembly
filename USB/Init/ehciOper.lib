@@ -25,17 +25,17 @@ PORTSCOffset   = 44h
 ; [9:8] - Asynch Shedule Park Mode; [7] - Light HC reset; [6] - Interrupt on Asynch Doorbell; [5] - Async Schedule; [4] - Periodic Schedule;  
 ; [3:2] - Frame list size; [1] - HC Reset; [0] - Run/Stop bit 
 ; Default = 00080000h 
-USBCMDReg	dw 0h 
+USBCMDReg			dd 0h 
 ; [0] - Complete USB Transation  
-USBSTSReg			dw 0h 
-USBINTReg			dw 0h 
-FRINDEXReg			dw 0h 
-CTRLDSSEGMENTReg 	dw 0h
-PeriodLBReg			dw 0h 
+USBSTSReg			dd 0h 
+USBINTReg			dd 0h 
+FRINDEXReg			dd 0h 
+CTRLDSSEGMENTReg 	dd 0h
+PeriodLBReg			dd 0h 
 ; [31:5] - Pointer to QH ; [4:0] - zeros (Pointer 32 byte aligned)
-AsуnchLBReg			dw 0h
+AsуnchLBReg			dd 0h
 ; HC configuration auxiliary use 
-CONFIGReg			dw 0h 
+CONFIGReg			dd 0h 
 
 ; =====================================================================================================
 
@@ -53,54 +53,7 @@ CONFIGReg			dw 0h
 		
 		mov edi, ebx 			; Save 
 		
-		; USB CMD
-		lea dx, USBCMDmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov eax, USBCMDoffset   ; USBCMD 
-
-		call retrieveOperRegister; Prints USB CMD Register 
-
-		call printNewLineRM     ; Prints New Line 
-
-		; USB STS 
-		lea dx, USBSTSmsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ; Base Address 
-		mov eax, USBSTSoffset   ; USBSTS 
-
-		call retrieveOperRegister ; Print USB STS
-
-		call printNewLineRM     ; Prints New Line 
-
-		;Period List Base 
-		
-		lea dx, PListBase       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ;  
-		mov eax, PeriodLBoffset ; USBSTS 
-
-		call retrieveOperRegister; Print Period Base
-		
-		call printNewLineRM     ; Prints New Line 
-
-		; PORTSC Register 
-		
-		lea dx, PORTSCMsg       ; Address for Message
-		mov ah, 09h             ; Print Function
-		int 21h
-
-		mov ebx, edi            ; 
-		mov eax, PORTSCoffset   ; PORTSC offset 
-		
-		call retrieveOperRegister; Print Period Base
-		
-		call printNewLineRM     ; Prints New Line 
+		call printOperRegInfo
 
 		;------------------------
 		; Out
@@ -137,7 +90,7 @@ CONFIGReg			dw 0h
 		call printWordFromStackRM
 		call printWordFromStackRM
 		
-		pop ecx                  ; Recover Registers
+		pop ecx                 ; Recover Registers
 		pop eax             	;
 		pop ebx                 ;
 		
@@ -211,7 +164,37 @@ CONFIGReg			dw 0h
 
 		mov ax, OperRegOff		 ;
 		add ebx, eax 			 ; Offset for Operation Registers
-		 
+
+		mov eax, fs:[ebx]		 ; USBCMD
+		mov USBCMDReg, eax 		 ; Save USBCMD
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; USBSTS 
+		mov USBSTSReg, eax 		 ; Save USBSTS
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; USBINT  
+		mov USBINTReg, eax 		 ; Save USBINT 
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; FRINDEX  
+		mov FRINDEXReg, eax 	 ; Save FRINDEX  
+				 
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; CTRLDSSEGMENT  
+		mov CTRLDSSEGMENTReg, eax; Save CTRLDSSEGMENT 
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; Period List Base
+		mov PeriodLBReg, eax 	 ; Save Period List Base
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; Asуnch List Base
+		mov AsуnchLBReg, eax 	 ; Save Asуnch List Base
+
+		add ebx, 04h			 ;
+		mov eax, fs:[ebx]		 ; CONFIG
+		mov CONFIGReg, eax 	 	 ; Save CONFIG
 
 		;------------------------;
 		pop edi 				 ;
@@ -220,7 +203,101 @@ CONFIGReg			dw 0h
 		pop ebx            		 ; Recover ebx 
 
 		ret 
+
 	endp
+
+	; Prints information about Operation Registres from memory  
+	;
+	; EBX - contains Base Address 
+	printOperRegInfo proc near 
+
+		push edx				;  
+		push eax 				;
+		push ebx 				;
+		push edi				;  
+		;-----------------------;
+
+		mov edi, ebx 			; Base Address Storage 
+		
+		mov ah, 09h				; Print String 
+		lea dx, USBCMDmsg		; 
+		int 21h					; 
+
+		mov eax, USBCMDoffset
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, USBSTSmsg		; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, USBSTSoffset   ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, USBINTmsg		; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, USBINToffset   ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, FRINDEXMsg		; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, FRINDEXoffset  ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, CTRLDSMsg		; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, CTRLDSoffset   ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, PListBaseMsg	; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, PeriodLBoffset ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, AListBaseMsg	; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, AsуnchLBoffset ; 
+		call retrieveOperRegister
+		call printNewLineRM
+
+		mov ah, 09h				; Print String 
+		lea dx, CONFIGMsg		; 
+		int 21h					; 
+
+		mov ebx, edi            ; Base Address
+		mov eax, CONFIGoffgset  ; 
+		call retrieveOperRegister
+
+		;-----------------------;
+		pop edi					;
+		pop ebx 				;
+		pop eax 				; 
+		pop edx 				;
+
+		ret
+
+	endp 
 
 
 endm
