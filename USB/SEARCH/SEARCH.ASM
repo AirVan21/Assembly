@@ -127,7 +127,7 @@ displayUSBtype:
 	jmp outUSBtype         ;
 
    showusb30:
-	lea dx, usb_20         ; Sets Appropriate String 
+	lea dx, usb_30         ; Sets Appropriate String 
 	
 outUSBtype:                ; Point to jump out of type definition
 	mov ah, 09h            ; Print string
@@ -152,11 +152,6 @@ processBARs:
 	mov ah, 09h            ; Print title
 	lea dx, bars           ;
 	int 21h                ;
-	
-	;lea dx, newLine        ; CLRF
-	;int 21h                ;
-	;lea dx, space          ; Correct Output
-	;int 21h                ; 
 	
 	mov cx, 6              ; Amount of bars | (set this variable)
    
