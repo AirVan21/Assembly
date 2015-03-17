@@ -30,16 +30,40 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		; Include code for Operational Registers Displacement CalCulation 
 		
-		call printEHCIOperInfo	          ; Operational Registers information	
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edi                 ;
+		;------------------------;
 		
+		mov edi, ebx 			 ; Save Base Address 
+				
+		call retrieveLegacyInterruptsEHCI 
+		call takeEHCIOwnership
+		call retrieveLegacyInterruptsEHCI
+
+		call updateOperRegInfo
+		call printOperRegInfo
+
+		call printNewLineRM
+		call printNewLineRM
+
+		mov ebx, edi 
+
+		call printUSBIntMonitor
   		
+  		;------------------------;
+		pop edi                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+
   		ret                               ; 
 
 	endp
 
 	; Retrieves Legacy Support Registers 
 	;
-	; EAX - contains PCI Address | Or from HCPCIAddress Variable
+	; PCI Address from HCPCIAddress Variable
 	; EBX - contains Base Address
 	retrieveLegacyInterruptsEHCI proc near
 
@@ -55,9 +79,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		and edx, 0000FFFFh		 ; Zero First Part 
 		shr edx, 8				 ; Lonely EECP Value 
 
-		mov dx, EECPvalue		 ; Save EECP Value 
-
-		mov ebx, edx 			 ; Copy EECP
+		mov EECPvalue, dx		 ; Save EECP Value 
 
 		add eax, edx			 ; OUT command for USBLEGSUPReg
  		add eax, USBLEGSUPoffset ; 
@@ -68,7 +90,9 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov USBLEGSUPReg, eax 	 ; 
 
 		mov eax, HCPCIAddress	 ; PCI Address in eax 
-		add eax, ebx			 ; OUT command for USBLEGSUPReg
+		xor edx, edx 		     ;
+		mov dx, EECPvalue 		 ; EECP value  
+		add eax, edx			 ; OUT command for USBLEGSUPReg
  		add eax, USBLEGCTLSTSoffset
  		mov dx, CONFIG_ADDR		 ; Sets out PORT address
 		out dx, eax 			 ; Sends request
@@ -87,11 +111,9 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 	; Prints Info From Legacy Registers 
 	; 
-	; EBX - contains Base Address 
 	printUSBIntMonitor proc near
 		
-		push ebx           		 ; Save 
-		push eax           		 ; 
+		push eax           		 ; Save 
 		push edx                 ;
 		;------------------------; 
 
@@ -121,8 +143,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		;------------------------;
 		pop edx                  ; 
-		pop eax                  ; 
-		pop ebx            		 ; Recover  
+		pop eax                  ;  Recover  
 
 		ret 
 
@@ -153,8 +174,29 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov eax, USBLEGSUPReg	 ; Legacy Support Register
 		or eax, 01000000h 		 ; Sets OS Owned bit 
 		out dx, eax				 ; Sets data to PCI device
-		mov USBLEGSUPReg, eax 	 ; 
-		
+		mov USBLEGSUPReg, eax 	 ;
+
+	  	xor ebx, ebx 			 ; 
+
+	  	mov eax, HCPCIAddress	 ; HC PCI Address
+	  	mov bx, EECPvalue 		 ; Value of Legacy USB Displacement 
+ 		add ebx, eax             ; Storage for PCI Address
+
+ 		; Waits Until BIOS Owned bit is Zero 
+
+	  waitBIOSOwnZero:
+	 
+	 	mov eax, ebx 			 ; PCI Address 
+		  	
+	  	mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		in  eax, dx				 ; Gets data from PCI device	
+
+		test eax, 00010000h 	 ;
+
+	  	jnz waitBIOSOwnZero		 
+
 		;------------------------;
 		pop edx                  ; 
 		pop eax                  ; 
@@ -162,6 +204,34 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		ret 
 	
+	endp
+
+	; Setup USB Interrupt Register
+	;
+	; EBX - contains Base Address 
+	initInterruptRegister proc near
+		
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------; 
+
+		xor edx, edx 			 ; 
+
+		mov dx, OperRegOff		 ; Offset for Operational Register
+		add ebx, USBINToffset    ;
+
+		mov eax, fs:[ebx]		 ; Gets Interrupt register 
+		or eax, 1Fh				 ; Up interrupt bits for OS owned mode
+		mov fs:[ebx], eax 		 ; 
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+
 	endp
 
 endm

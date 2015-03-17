@@ -345,20 +345,20 @@ DATA_SEG_START:
 
 ; STRING CONSTS 
 GreetMsg  	db "Protected mode on!$"
-CapLenMsg 	db "CAPLENGTH Register = $"
-HCVersion 	db "EHCI Revision      = $"
-N_PORTS   	db "Number of HC Ports = $"
-HCGreet   	db "Host Controller    = $"
+CapLenMsg 	db "CAPLENGTH Register   = $"
+HCVersion 	db "EHCI Revision        = $"
+N_PORTS   	db "Number of HC Ports   = $"
+HCGreet   	db "Host Controller      = $"
 
-USBCMDmsg 	 db "USBCMD Register    = $"
-USBSTSmsg 	 db "USBSTS Register    = $"
-USBINTmsg 	 db "USBINT Register    = $"
-FRINDEXMsg 	 db "FRINDEX Register   = $"
-CTRLDSMsg    db "CTRLDS Register    = $" 
-PListBaseMsg db "Periodic List Base = $"
-AListBaseMsg db "Asynch List Base   = $"
-CONFIGMsg 	 db "CONFIG Register    = $"
-PORTSCMsg 	 db "PORTSC Register    = $"
+USBCMDmsg 	 db "USBCMD Register     = $"
+USBSTSmsg 	 db "USBSTS Register     = $"
+USBINTmsg 	 db "USBINT Register     = $"
+FRINDEXMsg 	 db "FRINDEX Register    = $"
+CTRLDSMsg    db "CTRLDS Register     = $" 
+PListBaseMsg db "Periodic List Base  = $"
+AListBaseMsg db "Asynch List Base    = $"
+CONFIGMsg 	 db "CONFIG Register     = $"
+PORTSCMsg 	 db "PORTSC Register     = $"
 
 DATA_SEG_END:
 
