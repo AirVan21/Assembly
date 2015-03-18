@@ -7,6 +7,8 @@ messageLib macro
 qTDOffset   = 80h 
 qBuffOffset = 00008000h
 
+PeriodicFramInMem = 000F0000h 
+
 QHInMem    =  00A00000h
 qTDfirst   =  00A01000h
 qTDBufferR =  00900000h
@@ -213,13 +215,14 @@ qTDBufferW =  00800000h
 	; Sets USBCMD (Run/Stop) zero-bit to ONE  
 	; Software shouldn't write USBCMD (Run/Stop) until USBSTS (HCHalted) bit is one    
 	; 
-	; EBX - contains Base Address 
 	runHCinCMD proc
 
 		push edx						; Save Register
 		push ebx 						; 
 		push cx							;
 		
+		mov ebx, HCBaseAddress          ;
+
 		xor edx, edx                    
 
 		mov dx, OperRegOff				; Offset for Operational Register
