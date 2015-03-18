@@ -7,6 +7,7 @@ EECPvalue			dw 0h
 
 OperRegOff 			dw 20h
 HCPCIAddress 		dd 0h
+HCBaseAddress 		dd 0h 
 USBLEGSUPReg		dd 0h
 USBLEGCTLSTSReg 	dd 0h
 
@@ -35,22 +36,30 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push edi                 ;
 		;------------------------;
 		
-		mov edi, ebx 			 ; Save Base Address 
+		mov HCBaseAddress, ebx 	 ; Save Base Address 
 				
+		; Take Control Of USB HC from BIOS 
 		call retrieveLegacyInterruptsEHCI 
-		call takeEHCIOwnership
-		call retrieveLegacyInterruptsEHCI
+		call takeEHCIOwnership	 ; 
+		
+		; Resets HC to Default state
+		call performHCReset		 ; 
+		; Init Host Controler 
 
+		; Show Operational Registers
 		call updateOperRegInfo
 		call printOperRegInfo
-
+		
+		; Checks PORT state 
 		call printNewLineRM
-		call printNewLineRM
 
-		mov ebx, edi 
+		call printPORTSCinfo
+		
+		call printNewLineRM
 
 		call printUSBIntMonitor
   		
+
   		;------------------------;
 		pop edi                  ; 
 		pop eax                  ; 
@@ -61,10 +70,43 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 	endp
 
+	; Sets HC Reset bit in USB CMD to one 
+	; Waits 10 ms 
+	;
+	performHCReset proc near
+
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push ecx                 ;
+		;------------------------;
+
+		xor eax, eax 			 ; 
+
+		mov ebx, HCBaseAddress	 ; Base Address
+		mov ax, OperRegOff		 ; Offset to Operational Registers
+		add ebx, eax 			 ;
+
+		mov eax, fs:[ebx]		 ; USB CMD 
+		or eax, 02h				 ; HC Reset Bit to One
+		mov fs:[ebx], eax 		 ; Resets HC 
+   		
+   		mov ecx, 040h			 ; Waiting 10 ms 
+
+   	  waitHCReset:
+
+   	    loop waitHCReset         ;   
+   
+		;------------------------;
+		pop ecx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover 
+
+	endp
+
+
 	; Retrieves Legacy Support Registers 
 	;
 	; PCI Address from HCPCIAddress Variable
-	; EBX - contains Base Address
 	retrieveLegacyInterruptsEHCI proc near
 
 		push ebx           		 ; Save 
@@ -74,6 +116,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		mov eax, HCPCIAddress	 ; PCI Address in eax 
 
+		mov ebx, HCBaseAddress	 ; 
 		add ebx, HCCPARAMSoffset ; Points on HCCPARAMS Capacity Register 
 		mov edx, fs:[ebx]		 ; HCCPARAMS Register	
 		and edx, 0000FFFFh		 ; Zero First Part 
@@ -208,7 +251,6 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 	; Setup USB Interrupt Register
 	;
-	; EBX - contains Base Address 
 	initInterruptRegister proc near
 		
 		push ebx           		 ; Save 
@@ -218,11 +260,14 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		xor edx, edx 			 ; 
 
+		mov ebx, HCBaseAddress	 ; Base Address in EBX 
+
 		mov dx, OperRegOff		 ; Offset for Operational Register
+		add ebx, edx			 ; 
 		add ebx, USBINToffset    ;
 
 		mov eax, fs:[ebx]		 ; Gets Interrupt register 
-		or eax, 1Fh				 ; Up interrupt bits for OS owned mode
+		or eax, 03Fh			 ; Up interrupt bits for OS owned mode
 		mov fs:[ebx], eax 		 ; 
 
 		;------------------------;

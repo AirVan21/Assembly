@@ -100,7 +100,6 @@ CONFIGReg			dd 0h
 
 	; Prints information about HC Ports from PORTSC Registers  
 	;
-	; EBX - contains Base Address 
 	printPORTSCinfo proc 
 
 		push ebx           		 ; Save Registers  
@@ -109,18 +108,15 @@ CONFIGReg			dd 0h
 		push edi                 ;
 		;------------------------;
 
+		mov ebx, HCBaseAddress	 ; Base Address For HC 
+
 		mov edi, ebx 			 ; Save Base Address Register
 		
 		add ebx, HCSPARAMoffset	 ; 
 		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		
-
-		push cx 
-		call printWordFromStackRM; 
-	  	call printNewLineRM		 ;
-
-		add ecx, 8
+								 ; CX - contains number of ports 
 
 		xor eax, eax 			 ;
 		mov ax, OperRegOff
@@ -130,10 +126,14 @@ CONFIGReg			dd 0h
 	  loopOnPORTs:
 
 	  	mov eax, fs:[edi]		 ; PORTSC value 
-	  	; Prints Answer
+	  	; Save Answer
 	  	push ax 				 ; 
 	  	shr eax, 16              ;
 	  	push ax 				 ;
+	  	; Print header 
+	  	mov ah, 09h				 ;
+	  	lea dx, PORTSCMsg		 ;
+	  	int 21h					 ; 
 	  	call printWordFromStackRM;
 		call printWordFromStackRM; 
 	  	call printNewLineRM		 ;
@@ -149,11 +149,11 @@ CONFIGReg			dd 0h
 		pop ebx            		 ; Recover ebx 
 
 		ret 
+	
 	endp
 
 	; Updates information about Operation Registres in memory  
 	;
-	; EBX - contains Base Address 
 	updateOperRegInfo proc
 		
 		push ebx           		 ; Save Registers  
@@ -161,6 +161,8 @@ CONFIGReg			dd 0h
 		push ecx                 ;
 		push edi                 ;
 		;------------------------;
+
+		mov ebx, HCBaseAddress	 ; Base Address for HC 
 
 		mov ax, OperRegOff		 ;
 		add ebx, eax 			 ; Offset for Operation Registers
@@ -208,7 +210,6 @@ CONFIGReg			dd 0h
 
 	; Prints information about Operation Registres from memory  
 	;
-	; EBX - contains Base Address 
 	printOperRegInfo proc near 
 
 		push edx				;  
@@ -216,6 +217,8 @@ CONFIGReg			dd 0h
 		push ebx 				;
 		push edi				;  
 		;-----------------------;
+
+		mov ebx, HCBaseAddress	; Base Address
 
 		mov edi, ebx 			; Base Address Storage 
 		
