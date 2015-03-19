@@ -58,6 +58,8 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		call updateOperRegInfo
 		call printOperRegInfo
 		
+		
+		
 		; Checks PORT state 
 		call printNewLineRM
 
@@ -335,5 +337,99 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		ret 
 
 	endp
+
+	; Updates information about HC Ports from PORTSC Registers  
+	; 
+	updatePORTstate proc 
+
+		push ebx           		 ; Save Registers  
+		push eax           		 ; 
+		push ecx                 ;
+		push edi 				 ; 
+		;------------------------;
+
+		mov ebx, HCBaseAddress	 ; Base Address For HC 
+		
+		add ebx, HCSPARAMoffset	 ; 
+		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
+		and ecx, 000Fh 			 ; Set only N_PORTS Value 
+		
+								 ; CX - contains number of ports 
+
+		xor eax, eax 			 ;
+		mov ax, OperRegOff
+		add edi, eax  			 ; Pointer to Operational Registers
+		add edi, PORTSCoffset 	 ; 
+								 ; Counter = N_PORTS
+	  loopOnPORTstate:
+
+	  	mov eax, fs:[edi]		 ; PORTSC value  ;
+	  	test eax, 02h			 ; Test If Device State is "Changed"
+	  	jnz handleDeviceChange
+	  	
+	  	add edi, 04h             ; 32-bit step 
+
+	  	loop loopOnPORTstate	 ; Loop 
+
+	  handleDeviceChange:
+
+	  	call handleChangedStateDevice
+
+		;------------------------;
+		pop edi 				 ;
+		pop ecx                  ; 
+		pop eax                  ; Recover edi
+		pop ebx            		 ; Recover ebx 
+
+		ret 
+	
+	endp
+
+	; Set device "Changed state" bit to zero 
+	; Checks device power On bit 
+	; 
+	; If power-on bit is zero => Resets Device
+	; 
+	; EAX - contains PORTSC value
+	; EDI - contains address of PORTSC Register 
+	handleChangedStateDevice proc near 
+
+		push ebx           		 ; Save Registers  
+		push eax           		 ; 
+		push ecx                 ;
+		;------------------------;
+
+		and eax, 0FFFFFFFDh		 ; Zero Change state bit 
+		mov fs:[edi], eax 		 ; Apply Changes 
+
+		mov eax, fs:[edi]		 ; 
+		test eax, 01h 			 ; Test Connection State 
+		jz outOfChangeStateDevice
+		
+		and eax, 0FFFFFFFBh 	 ; Zero Port Enabled Bit
+		mov fs:[edi], eax 		 ; Apply Changes 
+
+		or eax, 100h 			 ; Up Reset (8-bit)
+		mov fs:[edi], eax        ; Reset Device
+
+		mov cx, 100h		
+	
+	waitPortReset:  			 ; Waits Port To ber Reset 
+		loop waitPortReset
+
+		mov eax, fs:[edi]		 ;
+		or eax, 04h			     ; Enable Port 
+		mov fs:[edi], eax 		 ; Apply Changes
+
+	outOfChangeStateDevice:
+		
+		;------------------------;
+		pop ecx                  ; 
+		pop eax                  ; Recover edi
+		pop ebx            		 ; Recover ebx 
+
+		ret 
+
+		endp
 
 endm
