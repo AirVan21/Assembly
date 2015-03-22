@@ -37,40 +37,48 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push ebx           		 ; Save 
 		push eax           		 ; 
 		push edi                 ;
+		push ecx				 ;
 		;------------------------;
 		
 		mov HCBaseAddress, ebx 	 ; Save Base Address 
 				
 		; Take Control Of USB HC from BIOS 
-		call retrieveLegacyInterruptsEHCI 
-		call takeEHCIOwnership	 ; 
+		;call retrieveLegacyInterruptsEHCI 
+		;call takeEHCIOwnership	 ;
+		;call retrieveLegacyInterruptsEHCI  
+		;call printUSBIntMonitor
+
+		; Checks PORT state 
+		;call printNewLineRM
 		
 		; Resets HC to Default state
-		call performHCReset		 ; 
+		;call performHCReset		 ; 
 		
 		; Init Host Controler 
-		call initializeHC		 ;
+		;call initializeHC		 ;
 		
-		; Set Run Bit 
-		call runHCinCMD          ; Sets RUN bit to ONE 
 		
 		; Show Operational Registers
-		call updateOperRegInfo
-		call printOperRegInfo
+		;call updateOperRegInfo
+		;call printOperRegInfo
 		
-		
-		
+		call introInMessaging
+
+		call runAQueueinCMD
+
 		; Checks PORT state 
-		call printNewLineRM
+		;call printNewLineRM
 
-		call printPORTSCinfo
+		;call printPORTSCinfo
 		
-		call printNewLineRM
-
-		call printUSBIntMonitor
-  		
-
+		;call printNewLineRM
+		
+		;call updatePORTstate
+		
+		;call updatePORTstateReset
+		
   		;------------------------;
+  		pop ecx 				 ;
 		pop edi                  ; 
 		pop eax                  ; 
 		pop ebx            		 ; Recover  
@@ -148,6 +156,9 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov fs:[ebx], PeriodicFramInMem
 
 		; Init Config Flag Register 
+
+		; Set Run Bit 
+		call runHCinCMD          ; Sets RUN bit to ONE 
 
 		mov eax, 01h 			 ; All PORT for HC 
 		sub ebx, PeriodLBoffset  ;
@@ -349,6 +360,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		;------------------------;
 
 		mov ebx, HCBaseAddress	 ; Base Address For HC 
+		mov edi, ebx 			 ; 
 		
 		add ebx, HCSPARAMoffset	 ; 
 		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
@@ -365,15 +377,40 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 	  	mov eax, fs:[edi]		 ; PORTSC value  ;
 	  	test eax, 02h			 ; Test If Device State is "Changed"
-	  	jnz handleDeviceChange
+	  	jz testNextPORTstate
 	  	
+	  	and eax, 0FFFFFFFDh		 ; Zero Change state bit 
+		mov fs:[edi], eax 		 ; Apply Changes 
+
+		mov eax, fs:[edi]		 ; 
+		test eax, 01h 			 ; Test Connection State 
+		jz testNextPORTstate
+		
+		and eax, 0FFFFFFFBh 	 ; Zero Port Enabled Bit
+		mov fs:[edi], eax 		 ; Apply Changes 
+
+		or eax, 100h 			 ; Up Reset (8-bit)
+		mov fs:[edi], eax        ; Reset Device
+
+		push cx                  ; Save old Counter
+		
+		mov cx, 100h		
+	  
+	  waitPortReset:  			 ; Waits Port To ber Reset 
+		loop waitPortReset
+
+		pop cx 					 ; Recover Old Counter
+
+								 ; Terminating Reset Sequence
+		mov eax, fs:[edi]		 ;
+		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
+		or eax, 04h			     ; Enable Port (2-nd bit) 
+		mov fs:[edi], eax 		 ; Apply Changes
+      
+      testNextPORTstate:
+
 	  	add edi, 04h             ; 32-bit step 
-
 	  	loop loopOnPORTstate	 ; Loop 
-
-	  handleDeviceChange:
-
-	  	call handleChangedStateDevice
 
 		;------------------------;
 		pop edi 				 ;
@@ -385,51 +422,54 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 	
 	endp
 
-	; Set device "Changed state" bit to zero 
-	; Checks device power On bit 
+		; Updates information about HC Ports from PORTSC Registers  
 	; 
-	; If power-on bit is zero => Resets Device
-	; 
-	; EAX - contains PORTSC value
-	; EDI - contains address of PORTSC Register 
-	handleChangedStateDevice proc near 
+	updatePORTstateReset proc 
 
 		push ebx           		 ; Save Registers  
 		push eax           		 ; 
 		push ecx                 ;
+		push edi 				 ; 
 		;------------------------;
 
-		and eax, 0FFFFFFFDh		 ; Zero Change state bit 
-		mov fs:[edi], eax 		 ; Apply Changes 
-
-		mov eax, fs:[edi]		 ; 
-		test eax, 01h 			 ; Test Connection State 
-		jz outOfChangeStateDevice
+		mov ebx, HCBaseAddress	 ; Base Address For HC 
+		mov edi, ebx 			 ; 
 		
-		and eax, 0FFFFFFFBh 	 ; Zero Port Enabled Bit
-		mov fs:[edi], eax 		 ; Apply Changes 
+		add ebx, HCSPARAMoffset	 ; 
+		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
+		and ecx, 000Fh 			 ; Set only N_PORTS Value 
+		
+								 ; CX - contains number of ports 
 
-		or eax, 100h 			 ; Up Reset (8-bit)
-		mov fs:[edi], eax        ; Reset Device
+		xor eax, eax 			 ;
+		mov ax, OperRegOff
+		add edi, eax  			 ; Pointer to Operational Registers
+		add edi, PORTSCoffset 	 ; 
+								 ; Counter = N_PORTS
+	  loopOnPORTstateReset:
 
-		mov cx, 100h		
-	
-	waitPortReset:  			 ; Waits Port To ber Reset 
-		loop waitPortReset
-
-		mov eax, fs:[edi]		 ;
-		or eax, 04h			     ; Enable Port 
+	  	mov eax, fs:[edi]		 ; PORTSC value  ;
+	  	test eax, 100h			 ; Test If Device State is "Changed"
+	  	jz testNextPORTstateReset
+	  	
+								 ; Terminating Reset Sequence
+		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
+		or eax, 04h			     ; Enable Port (2-nd bit) 
 		mov fs:[edi], eax 		 ; Apply Changes
+      
+      testNextPORTstateReset:
 
-	outOfChangeStateDevice:
-		
+	  	add edi, 04h             ; 32-bit step 
+	  	loop loopOnPORTstateReset; Loop 
+
 		;------------------------;
+		pop edi 				 ;
 		pop ecx                  ; 
 		pop eax                  ; Recover edi
 		pop ebx            		 ; Recover ebx 
 
 		ret 
-
-		endp
+	
+	endp
 
 endm

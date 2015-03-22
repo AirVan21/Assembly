@@ -7,7 +7,7 @@ messageLib macro
 qTDOffset   = 80h 
 qBuffOffset = 00008000h
 
-PeriodicFramInMem = 000F0000h 
+PeriodicFramInMem = 10000000h 
 
 QHInMem    =  00A00000h
 qTDfirst   =  00A01000h
@@ -28,8 +28,10 @@ qTDBufferW =  00800000h
 		xor edx, edx            ; 
 	
 
-		call stopHCinCMD 		;
+		call printNewLineRM
 
+		call printUploadBuffer
+		
 		call createMessageSequence
 
 		mov ebx, edi 			; 
@@ -38,7 +40,6 @@ qTDBufferW =  00800000h
 
 		mov ebx, edi 			; 
 
-		;call runHCinCMD 		;
 
 		call printNewLineRM
 
@@ -200,6 +201,7 @@ qTDBufferW =  00800000h
 
 										; Wait till apply 
 		mov cx, 040h 					; 64 iterations
+	
 	wait16Microframes:
 		loop wait16Microframes
 
