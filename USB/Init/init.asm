@@ -217,19 +217,20 @@ outOfBARCheck:
 	lea edx, HCBaseAddressStorage
 	lea esi, HCPCIAddressStorage
 
-;barLoop:
+barLoop:
 
 	mov ebx, dword ptr [edx]	; Gets Base address
 	mov eax, dword ptr [esi]	; Gets PCI address 
 	mov HCPCIAddress, eax 		; Write PCI address 
 	cmp ebx, 0                  ; If Valid Base Address
 	jz outOfBarLoop             ; Out in not Valid 
-	call printEHCIInfo
+	mov HCBaseAddress, ebx 	    ; Save Base Address 
+	;call printPORTSCinfo		;
 	add edx, 4                  ; Mov to the next Base Address
 	add esi, 4					; MOv to the next PCI 
 	call printNewLineRM          
 	
-	;loop barLoop
+	loop barLoop
 
 outOfBarLoop:
 

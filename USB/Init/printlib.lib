@@ -7,6 +7,15 @@ hex_table db "0123456789ABCDEF"
 newline   db " ", 13, 10, "$"
 space     db " $"
 
+PortValue:
+
+	dd 00h
+	dd 00h
+	dd 00h 
+	dd 00h
+	dd 00h  
+	dd 00h 
+
 ; =====================================================================================================
 
 	; Prints string while (charToPrint != '$')
@@ -198,39 +207,33 @@ space     db " $"
 		push edi                 ;
 		;------------------------;
 
-		mov ebx, HCBaseAddress	 ; Base Address For HC 
+		mov edi, HCBaseAddress	 ; Base Address For HC 
 
-		mov edi, ebx 			 ; Save Base Address Register
-		
-		add ebx, HCSPARAMoffset	 ; 
-		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
+		add edi, HCSPARAMoffset	 ; 
+		mov ecx, fs:[edi]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		
 								 ; CX - contains number of ports 
 
-		xor eax, eax 			 ;
+		lea ebx, PortValue       ; Storage for ports values						 
+		xor eax, eax 			 ;	
+		
 		mov ax, OperRegOff
+		mov edi, HCBaseAddress   ; 
 		add edi, eax  			 ; Pointer to Operational Registers
 		add edi, PORTSCoffset 	 ; 
 								 ; Counter = N_PORTS
 	  loopOnPORTs:
 
 	  	mov eax, fs:[edi]		 ; PORTSC value 
-	  	; Save Answer
-	  	push ax 				 ; 
-	  	shr eax, 16              ;
-	  	push ax 				 ;
-	  	; Print header 
-	  	mov ah, 09h				 ;
-	  	lea dx, PORTSCMsg		 ;
-	  	int 21h					 ; 
-	  	call printWordFromStackRM;
-		call printWordFromStackRM; 
-	  	call printNewLineRM		 ;
-	  	; Moves to the next register
+	  	mov [ebx], eax			 ;
+	  							 ; Moves to the next register
 	  	add edi, 04h             ; 32-bit step 
+	  	add ebx, 04h 			 ;
 
 	  	loop loopOnPORTs		 ; Loop 
+
+	  	call invokePortPrinter   ; 
 
 		;------------------------;
 		pop edi 				 ;
@@ -241,6 +244,53 @@ space     db " $"
 		ret 
 	
 	endp
+
+	invokePortPrinter proc near
+
+		push edx           		 ; Save Registers  
+		push esi                 ;
+		push eax           		 ; 
+		push ecx                 ;
+		;------------------------;
+
+		lea esi, PortValue       ; 
+		mov cx, 05h 			 ; Max Port Amount (Example)
+      
+      invokePortPrinterloop:
+	  	
+	  	mov eax, [esi]           ; 
+	  	cmp eax, 0h              ;
+	  	jz outOfInvokePortPrinter;
+	  	
+	  	push ax 
+	  	shr eax, 16
+	  	push ax 
+
+	  	; Print header 
+	  	mov ah, 09h				 ;
+	  	lea dx, PORTSCMsg		 ;
+	  	int 21h					 ; 
+
+	  	call printWordFromStackRM;
+		call printWordFromStackRM; 
+	  	call printNewLineRM		 ;
+
+	  	add esi, 04h             ;
+	  	loop invokePortPrinterloop
+
+	  outOfInvokePortPrinter:
+	  	
+	  	;------------------------;
+	  	pop ecx                  ; 
+		pop eax                  ; 
+		pop esi                  ; 
+		pop edx            		 ; Recover 
+
+		ret 
+
+
+	endp
+
 
 	; Prints information about Operation Registres from memory  
 	;

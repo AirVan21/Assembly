@@ -39,8 +39,6 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push edi                 ;
 		push ecx				 ;
 		;------------------------;
-		
-		mov HCBaseAddress, ebx 	 ; Save Base Address 
 				
 		; Take Control Of USB HC from BIOS 
 		;call retrieveLegacyInterruptsEHCI 
@@ -62,14 +60,13 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		;call updateOperRegInfo
 		;call printOperRegInfo
 		
-		call introInMessaging
+		;call introInMessaging
 
-		call runAQueueinCMD
 
 		; Checks PORT state 
 		;call printNewLineRM
 
-		;call printPORTSCinfo
+		call printPORTSCinfo
 		
 		;call printNewLineRM
 		
