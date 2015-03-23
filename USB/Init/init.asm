@@ -225,7 +225,7 @@ barLoop:
 	cmp ebx, 0                  ; If Valid Base Address
 	jz outOfBarLoop             ; Out in not Valid 
 	mov HCBaseAddress, ebx 	    ; Save Base Address 
-	;call printPORTSCinfo		;
+	call printPORTSCinfo		;
 	add edx, 4                  ; Mov to the next Base Address
 	add esi, 4					; MOv to the next PCI 
 	call printNewLineRM          

@@ -40,21 +40,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push ecx				 ;
 		;------------------------;
 				
-		; Take Control Of USB HC from BIOS 
-		;call retrieveLegacyInterruptsEHCI 
-		;call takeEHCIOwnership	 ;
-		;call retrieveLegacyInterruptsEHCI  
-		;call printUSBIntMonitor
-
-		; Checks PORT state 
-		;call printNewLineRM
-		
-		; Resets HC to Default state
-		;call performHCReset		 ; 
-		
-		; Init Host Controler 
-		;call initializeHC		 ;
-		
+		call performInitialWorkaround
 		
 		; Show Operational Registers
 		;call updateOperRegInfo
@@ -66,7 +52,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		; Checks PORT state 
 		;call printNewLineRM
 
-		call printPORTSCinfo
+		;call printPORTSCinfo
 		
 		;call printNewLineRM
 		
@@ -82,6 +68,39 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 
   		ret                               ; 
+
+	endp
+
+	; Takes Control of HC from BIOS 
+	; Initializes HC with default values
+	; 
+	performInitialWorkaround proc near
+
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edi                 ;
+
+		; Take Control Of USB HC from BIOS 
+		call retrieveLegacyInterruptsEHCI 
+		call takeEHCIOwnership	 ;
+		
+		; Logging information
+		call retrieveLegacyInterruptsEHCI  
+		call printUSBIntMonitor
+ 
+		call printNewLineRM
+		
+		; Resets HC to Default state
+		call performHCReset		 ; 
+		
+		; Init Host Controler 
+		call initializeHC		 ;
+		
+		pop edi                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover 
+
+		ret                      ;  
 
 	endp
 
@@ -104,11 +123,14 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov eax, fs:[ebx]		 ; USB CMD 
 		or eax, 02h				 ; HC Reset Bit to One
 		mov fs:[ebx], eax 		 ; Resets HC 
-   		 
+   		
+   		; Waits for Host Controller reset  
+   	  
    	  waitHCReset:
 
    	  	mov eax, fs:[ebx]        ; 
    	  	test eax, 02h            ;
+   	    
    	    jnz waitHCReset          ;   
    
 		;------------------------;
@@ -119,8 +141,12 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 	endp
 
 	; Perform Basic Init Actions 
+	; Inits Interrupt Register
+	; Inits Periodic Frame Regster 
+	; Sets Run/Stop bit in CMD Register to ONE  
+	; Inits Config Flag Registers  
 	; 
-	;
+	; 
 	initializeHC proc near
 		
 		push ebx           		 ; Save 
@@ -150,13 +176,12 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov cx, OperRegOff
 		add ebx, ecx 
 		add ebx, PeriodLBoffset
-		mov fs:[ebx], PeriodicFramInMem
-
-		; Init Config Flag Register 
+		mov fs:[ebx], PeriodicFramInMem 
 
 		; Set Run Bit 
 		call runHCinCMD          ; Sets RUN bit to ONE 
 
+		; Init Config Flag Register
 		mov eax, 01h 			 ; All PORT for HC 
 		sub ebx, PeriodLBoffset  ;
 		add ebx, CONFIGoffgset   ;
