@@ -24,6 +24,8 @@ USBLEGSUPmsg 	 db "USBLEGSUP  Register = $"
 USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 
+
+
 ; =====================================================================================================
 
  	; Prints information about HC I/O Registers 
@@ -40,15 +42,12 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push ecx				 ;
 		;------------------------;
 				
-		call performInitialWorkaround
+		;call performInitialWorkaround
 		
 		; Show Operational Registers
 		;call updateOperRegInfo
 		;call printOperRegInfo
 		
-		;call introInMessaging
-
-
 		; Checks PORT state 
 		;call printNewLineRM
 
@@ -56,10 +55,17 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		
 		;call printNewLineRM
 		
+		;call Wait05s
+
 		;call updatePORTstate
+		
+		;call Wait05s
 		
 		;call updatePORTstateReset
 		
+		call introInMessaging
+
+
   		;------------------------;
   		pop ecx 				 ;
 		pop edi                  ; 
@@ -83,12 +89,6 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		; Take Control Of USB HC from BIOS 
 		call retrieveLegacyInterruptsEHCI 
 		call takeEHCIOwnership	 ;
-		
-		; Logging information
-		call retrieveLegacyInterruptsEHCI  
-		call printUSBIntMonitor
- 
-		call printNewLineRM
 		
 		; Resets HC to Default state
 		call performHCReset		 ; 
@@ -359,7 +359,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		add ebx, USBINToffset    ;
 
 		mov eax, fs:[ebx]		 ; Gets Interrupt register 
-		or eax, 00Fh			 ; Up interrupt bits for OS owned mode
+		or eax, 03Fh			 ; Up interrupt bits for OS owned mode
 		mov fs:[ebx], eax 		 ; 
 
 		;------------------------;
@@ -413,21 +413,6 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 		or eax, 100h 			 ; Up Reset (8-bit)
 		mov fs:[edi], eax        ; Reset Device
-
-		push cx                  ; Save old Counter
-		
-		mov cx, 100h		
-	  
-	  waitPortReset:  			 ; Waits Port To ber Reset 
-		loop waitPortReset
-
-		pop cx 					 ; Recover Old Counter
-
-								 ; Terminating Reset Sequence
-		mov eax, fs:[edi]		 ;
-		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
-		or eax, 04h			     ; Enable Port (2-nd bit) 
-		mov fs:[edi], eax 		 ; Apply Changes
       
       testNextPORTstate:
 
@@ -444,7 +429,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 	
 	endp
 
-		; Updates information about HC Ports from PORTSC Registers  
+	; Updates information about HC Ports from PORTSC Registers  
 	; 
 	updatePORTstateReset proc 
 
@@ -471,12 +456,8 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 	  loopOnPORTstateReset:
 
 	  	mov eax, fs:[edi]		 ; PORTSC value  ;
-	  	test eax, 100h			 ; Test If Device State is "Changed"
-	  	jz testNextPORTstateReset
-	  	
 								 ; Terminating Reset Sequence
 		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
-		or eax, 04h			     ; Enable Port (2-nd bit) 
 		mov fs:[edi], eax 		 ; Apply Changes
       
       testNextPORTstateReset:
@@ -493,5 +474,19 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		ret 
 	
 	endp
+
+	PROC Wait05s near
+        push    ES
+        push    EAX
+        mov     AX,0
+        mov     ES,AX
+        mov     EAX,[ES:046Ch]
+        inc     EAX
+	@@Wait: cmp     EAX,[ES:046Ch]
+        jae     @@Wait
+        pop     EAX
+        pop     ES
+        ret
+	ENDP Wait05s
 
 endm

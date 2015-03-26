@@ -4,15 +4,70 @@ messageLib macro
 ; Temporary BAR information
 
 
-qTDOffset   = 100h 
+qTDOffset   = 20h 
 qBuffOffset = 00008000h
 
 PeriodicFramInMem = 01000000h 
 
-QHInMem    =  00A00000h
-qTDfirst   =  00A01000h
-qTDBufferR =  00900000h
-qTDBufferW =  00800000h
+QHInMemSA  =  000A0000h
+qTDfirst   =  000A0100h
+qTDBufferR =  00090000h
+qTDBufferW =  00080000h
+
+
+; АДРЕСА СТРУКТУР ДАННЫХ USB
+; НЕлинейный адрес очереди
+Addr_QH           DD ?
+; Нелинейный адрес массива дескрипторов передачи
+Addr_TD_Array     DD ?
+
+; Линейный адрес дескриптора команды
+Addr_CommandDescr DD ?
+; Линейный адрес буфера данных
+Addr_DataDescr    DD ?
+; Максимальный размер передаваемых данных у устройства
+db	0
+Max_Data_Size	DB  8
+db	0
+iMan	db 0;
+iProd	db 0;
+iSerial	db 0;
+
+EHCItop		dw EHCIbases
+EHCIbases	dd 20 dup(0) ; сохраним базы EHCI
+; ПАРАМЕТРЫ ТРАНЗАКЦИЙ
+; Номер кадра в момент начала транзакции
+StartFrame    DW ?
+; Состояние триггера данных
+DataTrigger   DD ?
+; Объем данных в передаваемом массиве
+BULK_DataSize DW 0
+
+; ДЕСКРИПТОРЫ КОМАНД
+; Дескриптор команды "Get Device Descriptor"
+GetDevDesc   DB 80h,6
+             DW 100h,0,8
+; Дескриптор команды "Get Device Descriptor" 18 байт
+GetDevDesc18 DB 80h,6
+             DW 100h,0,18
+; Дескриптор строки
+GetStrDesc64   DB 80h,6
+             DW 300h,0409h,64
+;                __ - здесь нуже индекс строки     
+; запрос английского языка
+; Создать дескриптор команды "Set Address"
+SetAddrDesc  DB 0,5
+             DW 1,0,0
+; Дескриптор команды "Get Configuration Descriptor"
+GetConfDesc  DB 80h,6
+             DW 200h,0,8
+;
+FrameListBaseAddr dw 0 	;FrameListBase
+FrameListBase db 9*1024 dup(0)
+
+; БУФЕР ДАННЫХ
+DataBuffer DB 4096 DUP(0) 
+
 
 	; Extra function Processing start 
 	; 
@@ -26,35 +81,24 @@ qTDBufferW =  00800000h
 		push ecx 
 
 		mov edi, ebx            ; Save Base Address
-		xor edx, edx            ; 
-	
-
-		call printUploadBuffer
 		
-		call constructQueueHead
+		
+		call InitializeQueueSpace
+		
+		call constructQueueHeadSA
 
-		call createMessageSequence
-
-		mov ebx, edi 			; 
+		;call createMessageSequence
 
 		call updateAsynchQueue	; 
 
-		mov ebx, edi 			; 
-
-		call runAQueueinCMD
-
-		mov cx, 5000h
-
-	  waintDeviceResp:
-	  	loop waintDeviceResp 	
-
-		call printNewLineRM
-
 		call printUploadBuffer
 
-		call printNewLineRM
+		;call printNewLineRM
 
-		
+		mov ebx, edi 			; 
+
+		;call runAQueueinCMD
+
 		pop ecx 
 		pop edi
 		pop edx 
@@ -79,35 +123,48 @@ qTDBufferW =  00800000h
 		;===============================
 		; Constructing Setup qTD
 		
+		xor ebx, ebx 
+		
 		; Next qTD pointer (0x00)
-		mov eax, qTDfirst               ; Address of first qTD 
-		mov edx, eax                    ; 
-		add edx, qTDOffset              ; Points to the next qTD 
-		mov fs:[eax], edx               ; Puts pointer in qTD 
+		mov eax, dword ptr[Addr_TD_Array]; Address of first qTD 
+		mov edx, eax                     ; 
+		add edx, qTDOffset               ; Points to the next qTD 
+		mov bx, ds  					 ;
+		shl ebx, 4                       ;
+		add ebx, edx                     ;
+		mov [eax], ebx                   ; Puts pointer in qTD 
 
 		; Alternative qTD (0x04) 
-		add eax, 4                      ; Next field
-		mov edx, 01h 				    ; Set Alternative qTD Invalid 
-		mov fs:[eax], edx               ; Alternative qTD = 0h 
+		add eax, 4                       ; Next field
+		mov edx, 01h 				     ; Set Alternative qTD Invalid 
+		mov [eax], edx                   ; Alternative qTD = 0h 
 
 		; qTD token (0x08)                   
-		add eax, 4                      ; 
-		mov edx, 00080E80h              ; 8 byte Payload [30:16] | Setup PID | Active bit 
-		mov fs:[eax], edx               ; 
+		add eax, 4                        ; 
+		mov edx, 00080E80h                ; 8 byte Payload [30:16] | Setup PID | Active bit 
+		mov [eax], edx                    ; 
 
 		; qTD Buffer Pointer list
 		; 4Kbyte (5000h) aligned (0x0C)
-		add eax, 4                      ;
-		mov edx, qTDBufferR             ; Payload Pointer 
-		mov fs:[eax], edx               ; 
+		add eax, 4                         ;
+		mov edx, dword ptr [Addr_DataDescr]; Payload Pointer 
+		mov fs:[eax], edx                  ; 
 
 		; Write Payload (8 byte)
-		mov edx, qTDBufferR             ;
-		mov ebx, 80060001h              ; GET_DESCRIPTOR (Device)
-		mov fs:[edx], ebx               ;
-		add edx, 4                      ;
-		mov ebx, 00004000h              ; Length of Descriptor 
-		mov fs:[edx], ebx               ;
+		mov edx, qTDBufferR               ;
+		xor ebx, ebx                      ;
+		mov bl, 80h                       ; bmRequestType
+		mov fs:[edx], bl                  ; 
+		mov bl, 00h                       ; bRequest
+		mov fs:[edx+1], bl                ; 
+		add edx, 2 						  ; 
+
+		xor bx, bx                      ; Zero 
+
+		mov fs:[edx], bx                ; wValue
+		mov fs:[edx+2], bx              ; wIndex
+		mov bx, 02h                     ; wLength
+		mov fs:[edx+4], bx              ;  
 
 		xor ebx, ebx 					; Zero Extra Buffer Pointers
 		; (0x10)
@@ -143,8 +200,8 @@ qTDBufferW =  00800000h
 		
 		; (0x08)
 		add eax, 04h 					;
-		mov ebx, 80400D80h 				; [31] = 1 In Packet; [14:10] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
-		mov fs:[eax], ebx				; [30:16] = 0x40 bytes to transfer 
+		mov ebx, 80020D80h 				; [31] = 1 In Packet; [14:12] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
+		mov fs:[eax], ebx				; [30:16] = bytes to transfer 
 		
 		; (0x0C)
 		add eax, 04h 					;
@@ -210,41 +267,60 @@ qTDBufferW =  00800000h
 	
 	; Constructing a Queue Head 
 	; 
-	constructQueueHead proc near
+	constructQueueHeadSA proc near
 		
 		push eax                        ; Saves eax
 		push ebx                        ; 
+		push edx                        ;
+		push cx                         ; 
 		;-------------------------------;
 
+		xor edx, edx                    ;
+		
 		; QH Horizontal Link Pointer (0x00)
-		mov eax, QHInMem                ; Pointer to the next Queue, which should be processed
+		mov eax, dword ptr [Addr_QH]    ; Pointer to the Queue
+		mov dx, ds                      ; Data Segment
+		shl edx, 4 						; Linear Address
+		add eax, edx                    ; 
 		mov ebx, eax				    ;
-		or ebx, 3h						; Marks this as "Invalid QH pointer"
-		mov fs:[eax], ebx        		; 2-nd bit shows that this is QH
+		or ebx, 03h						; Marks this as "Invalid QH pointer"
+		mov eax, dword ptr [Addr_QH]    ;
+		mov [eax], ebx        		    ; 2-nd bit shows that this is QH
 
 		; Endpoint characteristics (0x04)
 		add eax, 4                      ;
-		mov ebx, 0400E000h				;
-		mov fs:[eax], ebx    		    ; 0x400 - max packet size [26:16]
+		mov ebx, 0040D000h				;
+		mov [eax], ebx    		        ; (0x400 - max packet size [26:16])
 
 		; Transaction information (0x08)
 		add eax, 4 
-		mov ebx, 40000000h
-		mov fs:[eax], ebx 		        ; One transaction per microframe
+		mov ebx, 40000000h              ; Check! 
+		mov [eax], ebx 		            ; One transaction per microframe
 
 		; Current qTD (0x0C)
 		add eax, 4                      ; Set as Zero 
 		xor ebx, ebx 					; 
-		mov fs:[eax], ebx               ;
+		mov [eax], ebx                  ;
 
 		; Next qTD (0x10)
 		add eax, 4 
-		mov ebx, qTDfirst               ; Pointer to first qTD to process                        
-		mov fs:[eax], ebx               ;
+		mov ebx, Addr_TD_Array          ; Pointer to first qTD to process                        
+		xor edx, edx                    ;
+		mov dx, ds                      ;
+		shl edx, 4                      ; Linear Address
+		add edx, ebx                    ;
+		mov fs:[eax], edx               ;
 
-		;-------------------------------;
-		pop ebx
-		pop eax 
+		; Alternative qTD Pointer (0x14)
+		add eax, 4 
+		mov ebx, 01h 					; Mark as Invalid 
+		mov [eax], ebx                  ; Input invalid  
+
+		;-------------------------------;	
+		pop cx                          ;
+		pop edx 						;
+		pop ebx 						; 
+		pop eax  					    ; 
 		
 		db 0C3h                			; ret 
 
@@ -336,7 +412,7 @@ qTDBufferW =  00800000h
 		add ebx, edx                    ; USBCMD Base Address 
 
 		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		and edx, 0ffffffefh             ; Clears Asynch Queue bit 
+		and edx, 0ffffffdfh             ; Clears Asynch Queue bit 
 		mov fs:[ebx], edx               ; Set updated value 
 
 										; Recover Register 
@@ -349,7 +425,6 @@ qTDBufferW =  00800000h
 
 	; Sets USBCMD (Asynch Queue) bit to ONE 
 	; 
-	; EBX - contains Base Address 
 	runAQueueinCMD proc
 
 		push edx						; Save Register
@@ -363,7 +438,7 @@ qTDBufferW =  00800000h
 		add ebx, edx                    ; USBCMD Base Address 
 
 		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		or edx, 10h   			        ; Clears Asynch Queue bit 
+		or edx, 20h   			        ; Clears Asynch Queue bit 
 		mov fs:[ebx], edx               ; Set updated value 
 
 										; Recover Register 
@@ -390,7 +465,15 @@ qTDBufferW =  00800000h
 		add dx, AsуnchLBoffset			;
 		add ebx, edx					; Points in AsуnchLBReg 
 
-		mov eax, QHInMem				; Address of Queue Structure
+		
+		xor eax, eax 
+
+		mov edx, dword ptr [Addr_QH]    ;
+		mov ax, ds                      ; Data Segment
+		shl eax, 4                      ; 
+
+		add eax, edx 
+		
 		mov fs:[ebx], eax 				; Point on own Queue 
 
 		pop edx 
@@ -400,21 +483,6 @@ qTDBufferW =  00800000h
 		db 0C3h                			; ret 
 
 
-	; Init Periodic List Base
-	;	
-	; EBX - contains Base Address 
-	initAListBase:
-
-		push eax                        ; Saves eax
-		push ebx                        ; 
-		push edx   
-
-		
-		pop edx 
-		pop ebx                         ; Recover 
-		pop eax 
-
-		db 0C3h                			; ret 
 
 	; Prints Data From Simple Buffer
 	; 
@@ -424,8 +492,23 @@ qTDBufferW =  00800000h
 		push ebx                        ; 
 		push edx   
 
-		mov eax, qTDBufferW				;
-		mov ebx, fs:[eax]				; Gets DWORD from Buffer 
+		
+		mov ebx, dword ptr [Addr_DataDescr]
+ 
+ 		push bx
+		shr ebx, 16
+		push bx 
+
+		call printWordFromStackRM
+		call printWordFromStackRM 
+
+		call printNewLineRM
+
+		mov edx, 5555h
+		mov [Addr_DataDescr], edx
+		
+
+		mov ebx, [Addr_DataDescr]  ; Gets DWORD from Buffer 
 
 		push bx
 		shr ebx, 16
@@ -433,12 +516,79 @@ qTDBufferW =  00800000h
 
 		call printWordFromStackRM
 		call printWordFromStackRM 
-
+		
 		pop edx 
 		pop ebx                         ; Recover 
 		pop eax 
 
 		db 0C3h                			; ret 
 
+	; Prints Data From Simple Buffer
+	; 
+	clearUploadBuffer:
+
+		push eax                        ; Saves eax
+		push ebx                        ; 
+		
+		xor ebx, ebx 
+
+		mov eax, qTDBufferW				;
+		mov fs:[eax], ebx				;  
+
+		pop ebx                         ; Recover 
+		pop eax 
+
+		db 0C3h                			; ret 
+
+	; Init Space for Queue Structures  
+	; 
+	InitializeQueueSpace:
+		
+        pushad
+
+		;-----------------------;
+        ; Вычислить линейный адрес сегмента дескрипторов
+        xor     eax, eax 
+        mov     ax, ds
+        shl     eax, 4
+        mov     edx, eax    ;запомнить адрес сегмента
+        xor     eax, eax
+        xor     ebx, ebx 
+        mov     bx, offset FrameListBase ; Адрес
+	    add	    ebx, edx
+	    and	    ebx, 0FFFFF000h
+	    add	    ebx, 1000h		; выровняли на границу 4 килобайт
+	    sub	    ebx, edx
+        mov     FrameListBaseAddr, bx	; адрес не линейный (выровненный на гранцу 4К)
+        
+        ; Вычислить линейный адрес буфера данных
+        xor     eax, eax 
+        xor     ebx, ebx
+        lea     bx, DataBuffer
+        ; В edx адрес сегмента
+        add     ebx, edx
+        and	    ebx, 0FFFFF000h
+	    add	    ebx, 1000h		; выровняли на границу 4 килобайт
+        mov     [Addr_DataDescr], ebx	; адрес линейный
+        
+        ; Вычислить линейный адрес заголовка списка выровняв его по границе 16 байт
+	    ; теперь дескриптор будет выровнен по этой границе, но его нужно заново заполнить
+	    xor	ebx,ebx
+	    mov bx, FrameListBaseAddr
+	    add	ebx, 4096
+        mov [Addr_QH], ebx		; адрес не линейный Начала Очереди
+	    
+	   
+	   ; Вычислить указатель на массив дескрипторов
+       
+	   mov	eax, ebx
+	   add	eax, 30h
+	   and	eax, 0FFFFFFF0h
+
+	   mov [Addr_TD_Array], eax  ; запись нелинейного адреса
+         
+       popad
+        
+	   db 0C3h                	; ret 
 
 endm
