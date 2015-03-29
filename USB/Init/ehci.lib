@@ -23,6 +23,10 @@ USBLEGCTLSTSoffset   = 04h
 USBLEGSUPmsg 	 db "USBLEGSUP  Register = $"
 USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
+sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
+sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
+sHCInitDone 	 db "HC Init Done", 13, 10, "$"
+
 
 
 
@@ -32,7 +36,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 	;
 	; EBX - contains BAR address | Or Not 
 	; FS  - contains Selector For Zero Memory
-	printEHCIInfo proc near  
+	processEHCIHC proc near  
 
 		; Include code for Operational Registers Displacement CalCulation 
 		
@@ -42,29 +46,35 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push ecx				 ;
 		;------------------------;
 				
-		;call performInitialWorkaround
+		call performInitialWorkaround
 		
-		; Show Operational Registers
-		;call updateOperRegInfo
-		;call printOperRegInfo
-		
-		; Checks PORT state 
-		;call printNewLineRM
+		call Wait05s
 
-		;call printPORTSCinfo
+		call updatePORTstate
 		
-		;call printNewLineRM
+		call Wait05s
 		
-		;call Wait05s
+		call updatePORTstateReset
 
-		;call updatePORTstate
+		call constructQueueHead
+		call createMessageSequenceSetup
 		
-		;call Wait05s
-		
-		;call updatePORTstateReset
-		
-		call introInMessaging
+		call runAQueueinCMD
 
+		call Wait05s
+
+		call stopAQueueinCMD
+
+		call constructQueueHead
+		call createMessageSequenceIN
+		
+		call runAQueueinCMD
+
+		call Wait05s
+
+		call stopAQueueinCMD
+
+		call printOutBufferDump
 
   		;------------------------;
   		pop ecx 				 ;
@@ -85,17 +95,36 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		push ebx           		 ; Save 
 		push eax           		 ; 
 		push edi                 ;
+		push dx                  ;
+		;------------------------;
 
 		; Take Control Of USB HC from BIOS 
 		call retrieveLegacyInterruptsEHCI 
 		call takeEHCIOwnership	 ;
+
+		; Info message 
+		mov ah, 09 				 ;
+		lea dx, sTakeBIOSControl ; 
+		int 21h                  ;
 		
 		; Resets HC to Default state
 		call performHCReset		 ; 
-		
+
+		; Info message 
+		mov ah, 09 				 ;
+		lea dx, sHCResetDone	 ;  
+		int 21h                  ;
+
 		; Init Host Controler 
 		call initializeHC		 ;
+
+		; Info message 
+		mov ah, 09 				 ;
+		lea dx, sHCInitDone		 ; 
+		int 21h                  ;
 		
+		;------------------------;
+		pop dx 					 ;
 		pop edi                  ; 
 		pop eax                  ; 
 		pop ebx            		 ; Recover 
@@ -176,11 +205,12 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		mov cx, OperRegOff
 		add ebx, ecx 
 		add ebx, PeriodLBoffset
-		mov fs:[ebx], PeriodicFramInMem 
+		mov fs:[ebx], PeriodicFramInMem
 
-		; Set Run Bit 
-		call runHCinCMD          ; Sets RUN bit to ONE 
-
+		call initAsynchQueue 
+		
+		call runHCinCMD			 ; 
+		
 		; Init Config Flag Register
 		mov eax, 01h 			 ; All PORT for HC 
 		sub ebx, PeriodLBoffset  ;
@@ -359,6 +389,7 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 		add ebx, USBINToffset    ;
 
 		mov eax, fs:[ebx]		 ; Gets Interrupt register 
+		;mov eax, 0h              ; 
 		or eax, 03Fh			 ; Up interrupt bits for OS owned mode
 		mov fs:[ebx], eax 		 ; 
 
