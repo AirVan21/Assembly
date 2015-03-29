@@ -232,7 +232,7 @@ WriteBuffer db 4096 DUP(0)
 	
 	; Constructing a Queue Head 
 	; 
-	constructQueueHead proc near
+	createQueueHead proc near
 		
 		push eax                        ; Saves eax
 		push ebx                        ; 
