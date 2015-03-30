@@ -5,7 +5,7 @@ initPrint	macro
 
 hex_table db "0123456789ABCDEF"
 newline   db " ", 13, 10, "$"
-space     db " $"
+space     db " : $"
 
 PortValue:
 
@@ -197,6 +197,22 @@ PortValue:
 
 	endp
 
+	printSpaceRM proc near
+
+		push ax 				; Save Registers 
+		push dx 
+
+		mov ah, 09h             ; Print String Function 
+		lea dx, space         ; DX - address of new line string 
+		int 21h                 ; MS-DOS call 
+
+		pop dx 					; Recover Registers
+		pop ax 
+
+		ret
+
+	endp
+
 	; Prints information about HC Ports from PORTSC Registers  
 	;
 	printPORTSCinfo proc 
@@ -209,7 +225,7 @@ PortValue:
 
 		mov edi, HCBaseAddress	 ; Base Address For HC 
 
-		add edi, HCSPARAMoffset	 ; 
+		add edi, HCSPARAMSoffset ; 
 		mov ecx, fs:[edi]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		

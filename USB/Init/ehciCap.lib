@@ -3,7 +3,7 @@
 ; =====================================================================================================
 
 HCIVERSIONoffset	= 02h
-HCSPARAMSoffset		= 04h
+HCSPARAMSoffset 	= 04h 
 HCCPARAMSoffset 	= 08h
 
 

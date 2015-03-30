@@ -24,6 +24,35 @@ BAR4 = 20h               ; #4
 BAR5 = 24h               ; #5   
 
 ; =====================================================================================================
+; USB Devices Addresses 
+
+HCBaseAddressStorage:
+
+	dw 0h 	; #1 
+	dw 0h 	; #2
+	dw 0h 	; #3
+	dw 0h 	; #4
+	dw 0h 	; #5
+	dw 0h 	; #6
+	dw 0h 	; #7
+	dw 0h 	; #8
+	dw 0h 	; #9
+	dw 0h 	; #10 
+
+HCPCIAddressStorage:
+
+	dw 0h 	; #1 
+	dw 0h 	; #2
+	dw 0h 	; #3
+	dw 0h 	; #4
+	dw 0h 	; #5
+	dw 0h 	; #6
+	dw 0h 	; #7
+	dw 0h 	; #8
+	dw 0h 	; #9
+	dw 0h 	; #10 
+
+; =====================================================================================================
 
 ; Main Search Function
 ; Retrievs information about PCI Device from Configuration space
@@ -189,6 +218,11 @@ nextFunction:
 	test ecx, OUT_OF_BUS   		; First out of Bus digit
 	jz searchUSBHCinPCI         ; Next function iteration
 	jmp outOfSearchUSBHCinPCI	;
-	
 
+; Out Of 
+;
+outOfSearchUSBHCinPCI:
+
+	db 0C3h                			; ret 
+	
 endm

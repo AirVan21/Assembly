@@ -17,9 +17,7 @@ _:
 	; Setting Default PCI Address 
 	; ECX - parameter for searchUSBHCinPCI 
 	mov ecx, (DEFAULT_ADDR + CLASS_SUBCLASS)
-	jmp searchUSBHCinPCI
-
-  outOfSearchUSBHCinPCI:
+	call searchUSBHCinPCI
 	
 	call set_prot_mode     		; Setting FS register for Long Addressing 
 	
@@ -59,33 +57,6 @@ initCapacityInfo
 initPCIConfig
 
 ; =====================================================================================================
-; USB Devices Addresses 
-
-HCBaseAddressStorage:
-
-	dw 0h 	; #1 
-	dw 0h 	; #2
-	dw 0h 	; #3
-	dw 0h 	; #4
-	dw 0h 	; #5
-	dw 0h 	; #6
-	dw 0h 	; #7
-	dw 0h 	; #8
-	dw 0h 	; #9
-	dw 0h 	; #10 
-
-HCPCIAddressStorage:
-
-	dw 0h 	; #1 
-	dw 0h 	; #2
-	dw 0h 	; #3
-	dw 0h 	; #4
-	dw 0h 	; #5
-	dw 0h 	; #6
-	dw 0h 	; #7
-	dw 0h 	; #8
-	dw 0h 	; #9
-	dw 0h 	; #10 
 
 	main endp
 	USBCode ends

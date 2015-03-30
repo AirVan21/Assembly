@@ -60,16 +60,19 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call createQueueHead
 		call createMessageSequenceSetup
 		call runAQueueinCMD
-		call Wait05s
+		call Wait05s 
 		call stopAQueueinCMD
+		
+		; DEBUG 
+		;call updateOperRegInfo
+		;call printOperRegInfo
 
 		; In Transaction
 		call createQueueHead
 		call createMessageSequenceIN
 		call runAQueueinCMD
-		call Wait05s
+		call Wait05s 
 		call stopAQueueinCMD
-
 		call printOutBufferDump
 
   		;------------------------;
@@ -389,7 +392,6 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		add ebx, USBINToffset    ;
 
 		mov eax, fs:[ebx]		 ; Gets Interrupt register 
-		;mov eax, 0h              ; 
 		or eax, 03Fh			 ; Up interrupt bits for OS owned mode
 		mov fs:[ebx], eax 		 ; 
 
@@ -415,7 +417,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		mov ebx, HCBaseAddress	 ; Base Address For HC 
 		mov edi, ebx 			 ; 
 		
-		add ebx, HCSPARAMoffset	 ; 
+		add ebx, HCSPARAMSoffset ; 
 		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		
@@ -473,7 +475,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		mov ebx, HCBaseAddress	 ; Base Address For HC 
 		mov edi, ebx 			 ; 
 		
-		add ebx, HCSPARAMoffset	 ; 
+		add ebx, HCSPARAMSoffset ; 
 		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		

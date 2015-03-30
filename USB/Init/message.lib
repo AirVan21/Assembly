@@ -34,14 +34,6 @@ Addr_DataDescr    DD ?
 Addr_WriteDataDescr DD ?
 
 
-; ПАРАМЕТРЫ ТРАНЗАКЦИЙ
-; Номер кадра в момент начала транзакции
-StartFrame    DW ?
-; Состояние триггера данных
-DataTrigger   DD ?
-; Объем данных в передаваемом массиве
-BULK_DataSize DW 0
-
 ; ДЕСКРИПТОРЫ КОМАНД
 ; Дескриптор команды "Get Device Descriptor"
 GetDevDesc   DB 80h,6
@@ -72,34 +64,27 @@ FrameListBaseAddr dw 0 	;FrameListBase
 
 FrameListBase db 8*1024 dup(0)
 
-; Data  Buffer
+; Data  Buffer (Information For Devices)
 ;
 DataBuffer db 4096 DUP(0) 
 
-; Buffer for Information From Devices
+; Buffer for (Information From Devices)
 ; 
 WriteBuffer db 4096 DUP(0) 
 
 
 
-	initAsynchQueue:
-
-		push eax				; Save Registers 
-		push ebx
-		push edx 
+	initAsynchQueue proc near
 
 		call InitializeQueueSpace
 
 		call updateAsynchQueue
 
-		pop edx 
-		pop ebx
-		pop eax 
-
 		db 0C3h                			; ret  
 
+	endp
 
-	; Setup Control Traffiic
+	; 
 	;
 	createMessageSequenceSetup:
 
@@ -248,7 +233,7 @@ WriteBuffer db 4096 DUP(0)
 		shl edx, 4 						; Linear Address
 		add eax, edx                    ; 
 		mov ebx, eax				    ;
-		or ebx, 02h						; Marks this as "Invalid QH pointer"
+		or ebx, 02h						; 
 		mov eax, dword ptr [Addr_QH]    ;
 		mov [eax], ebx        		    ; 2-nd bit shows that this is QH
 
@@ -297,43 +282,6 @@ WriteBuffer db 4096 DUP(0)
 
 	endp 
 
-
-
-
-	; Sets USBCMD (Run/Stop) zero-bit to ZERO  
-	; Wait for 16 microframes   
-	; 
-	; EBX - contains Base Address 
-	stopHCinCMD proc
-
-		push edx						; Save Register
-		push ebx 						; 
-		push cx                         ;
-
-		xor edx, edx                    
-
-		mov dx, OperRegOff				; Offset for Operational Register
-		add ebx, edx                    ; USBCMD Base Address 
-
-		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		and edx, 0fffffffeh             ; Clears Run/Stop bit 
-		mov fs:[ebx], edx               ; Set updated value 
-
-										; Wait till apply 
-		mov cx, 040h 					; 64 iterations
-	
-	wait16Microframes:
-		loop wait16Microframes
-
-		pop cx  						; Recover Register 
-		pop ebx 						;
-		pop edx 						; 
-
-		ret 
-	
-	endp 
-
-
 	; Sets USBCMD (Run/Stop) zero-bit to ONE  
 	; Software shouldn't write USBCMD (Run/Stop) until USBSTS (HCHalted) bit is one    
 	; 
@@ -357,8 +305,6 @@ WriteBuffer db 4096 DUP(0)
 
 		add ebx, USBSTSoffset			; USB STS Address 
 
-		; Under Question! (USB STS BLOCKING FACTOR)
-
 	  waitHCHaltedBit:               
 		mov eax, fs:[ebx]				; Get USBSTS value 
 		test eax, 00001000h             ; Checking 12-th bit 
@@ -372,10 +318,11 @@ WriteBuffer db 4096 DUP(0)
 	
 	endp
 
-	; Sets USBCMD (Asynch Queue) bit to ZERO  
+	; Sets USBCMD (Run/Stop) zero-bit to ZERO  
+	; Wait for 16 microframes   
 	; 
 	; EBX - contains Base Address 
-	stopAQueueinCMD proc
+	stopHCinCMD proc
 
 		push edx						; Save Register
 		push ebx 						; 
@@ -386,16 +333,15 @@ WriteBuffer db 4096 DUP(0)
 		add ebx, edx                    ; USBCMD Base Address 
 
 		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		and edx, 0ffffffdfh             ; Clears Asynch Queue bit 
+		and edx, 0fffffffeh             ; Clears Run/Stop bit 
 		mov fs:[ebx], edx               ; Set updated value 
-
 										; Recover Register 
 		pop ebx 						;
 		pop edx 						; 
 
 		ret 
 	
-	endp
+	endp 
 
 	; Sets USBCMD (Asynch Queue) bit to ONE 
 	; 
@@ -423,6 +369,72 @@ WriteBuffer db 4096 DUP(0)
 		ret 
 	
 	endp 	 	 
+
+	; Sets USBCMD (Asynch Queue) bit to ZERO  
+	; 
+	; EBX - contains Base Address 
+	stopAQueueinCMD proc
+
+		push edx						; Save Register
+		push ebx 						; 
+
+		xor edx, edx                    
+
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Base Address 
+
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		and edx, 0ffffffdfh             ; Clears Asynch Queue bit 
+		mov fs:[ebx], edx               ; Set updated value 
+
+										; Recover Register 
+		pop ebx 						;
+		pop edx 						; 
+
+		ret 
+	
+	endp
+
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; Wait Until Asyhch Queue is valid (transaction end)
+	; 
+	;
+	performAQTransaction proc
+
+		push edx						; Save Register
+		push ebx 						; 
+
+		mov ebx, HCBaseAddress 		    ; Gets Base Address
+
+		xor edx, edx                    
+
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Base Address 
+
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		or edx, 20h   			        ; Sets Asynch Queue bit 
+		mov fs:[ebx], edx               ; Set updated value
+
+		add ebx, USBSTSoffset			; Points to USBSTS Register 
+
+	  waitWhileAQisActive:				; Wait till transaction end 
+
+	  	mov edx, fs:[ebx] 				; USBSTS 
+	  	test edx, 00002000h				; Checking Reclamation bit 
+	  	jz waitWhileAQisActive			;
+
+	  	sub ebx, USBSTSoffset			;
+	  	mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		and edx, 0ffffffdfh             ; Clears Asynch Queue bit && Reclamation bit 
+		mov fs:[ebx], edx               ; Set updated value 
+
+										; Recover Register 
+		pop ebx 						;
+		pop edx 						; 
+
+		ret 
+	
+	endp 	
 
 	; Sets AsуnchLBRegister on Already Created Queue Structure
 	; 
@@ -588,7 +600,7 @@ WriteBuffer db 4096 DUP(0)
 
 		db 0C3h                			; ret 
 
-		; Prints Transaction Dump 	
+	; Prints Transaction Dump 	
 	;	
 	;
 	printOutBufferDump:
