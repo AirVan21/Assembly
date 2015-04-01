@@ -37,7 +37,7 @@ RM_DATA_ACCESS_R = 10010010b  ;
 ; EAX   - Segment address
 ; EDX   - Segment limit
 ; CL    - Access rights
-set_prot_mode:
+setProtectedMode:
 	
 	call saveRMregisters            ; Saves registers from real mode                   ; 
 

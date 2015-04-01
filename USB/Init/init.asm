@@ -19,7 +19,7 @@ _:
 	mov ecx, (DEFAULT_ADDR + CLASS_SUBCLASS)
 	call searchUSBHCinPCI
 	
-	call set_prot_mode     		; Setting FS register for Long Addressing 
+	call setProtectedMode     	; Setting FS register for Long Addressing 
 	
 	mov cx, 10            		; Counter for bar Amount
 								; Address of Possible BAR 

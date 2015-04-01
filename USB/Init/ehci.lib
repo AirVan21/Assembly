@@ -43,7 +43,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		push ebx           		 	; Save 
 		push eax           		 	; 
 		push edi                 	;
-		push ecx				 	;
+		push esi				 	;
 		;---------------------------;
 				
 		; Rests HC and Inits Registers
@@ -58,25 +58,30 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 
 		; Setup Transaction
 		call createQueueHead
-		call createMessageSequenceSetup
+		lea esi, GetDeviceDescReq18
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+
+		; DEBUG 
+		;call updateOperRegInfo
+		;call printOperRegInfo
+		;call updateCapRegInfo
+		;call printCapRegInfo
+		
+		; In Transaction
+		call createQueueHead
+		call createInQTD
+		
 		call runAQueueinCMD
 		call Wait05s 
 		call stopAQueueinCMD
 		
-		; DEBUG 
-		;call updateOperRegInfo
-		;call printOperRegInfo
-
-		; In Transaction
-		call createQueueHead
-		call createMessageSequenceIN
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
 		call printOutBufferDump
 
   		;------------------------;
-  		pop ecx 				 ;
+  		pop esi 				 ;
 		pop edi                  ; 
 		pop eax                  ; 
 		pop ebx            		 ; Recover  
