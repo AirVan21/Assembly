@@ -54,15 +54,9 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call Wait05s
 		call updatePORTstateReset
 
-		; Setup Transaction
-		call createQueueHead
-		lea esi, GetDeviceDescReq18
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
+		call getDeviceDescTransaction
 
-		call printQTDStatus
+		;call printQTDStatus
 		
 		;DUMP 
 		;call printTDArrayDump
@@ -83,17 +77,17 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		;call printTDArrayDump
 		
 		; In Transaction
-		call createQueueHead
-		call createInQTD
+		;call createQueueHead
+		;call createInQTD
 		
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
+		;call runAQueueinCMD
+		;call Wait05s 
+		;call stopAQueueinCMD
 		
-		call printQTDStatus
+		;call printQTDStatus
 		
-		call printTDArrayDump
-		call printOutBufferDump
+		;call printTDArrayDump
+		;call printOutBufferDump
 
 		;call testPortFunctions
 		;call Wait05s 
@@ -552,6 +546,42 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
         pop     EAX
         pop     ES
         ret
+	
+	endp
+
+	; Perform GET_DESCRIPTOR (Device) transaction 
+	;
+	getDeviceDescTransaction proc near 
+		
+		push esi 				 ; 
+		;------------------------;
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetDeviceDescReq18
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Prints Result 
+		mov esi, [LinearWriteBufferAddress]
+		call retrieveDeviceDescriptor
+		call printDeviceDescriptor
+
+		;------------------------;
+		pop esi            		 ; Recover ebx 
+
+		ret 
 	
 	endp
 

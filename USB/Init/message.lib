@@ -35,17 +35,19 @@ QHAddressInMem    		dd 0h
 ; 
 LinearQHAddressInMem    dd 0h 
 
-; Нелинейный адрес массива дескрипторов передачи
+; Non Linear Address of qTD In Memory
+;
 QTDAddress1      		dd 0h
 
+; Linear Address of qTD In Memory
+;
 LinearQTDAddress1 		dd 0h  
 
-; Линейный адрес дескриптора команды
-Addr_CommandDescr DD ?
-; Линейный адрес буфера данных
-Addr_DataDescr    DD ?
+; Linear Address of Data Buffer In Memory
+;
+LinearDataBufferAddress	dd 0h
 
-Addr_WriteDataDescr DD ?
+LinearWriteBufferAddress dd 0h
 
 ; =====================================================================================================
 ; Standard Device Requests
@@ -161,7 +163,7 @@ WriteBuffer db 4096 DUP(0)
 		; qTD Buffer Pointer list
 		; 4Kbyte (5000h) aligned (0x0C)
 		add eax, 4                         ;
-		mov edx, dword ptr [Addr_DataDescr]; Payload Pointer 
+		mov edx, dword ptr [LinearDataBufferAddress]; Payload Pointer 
 		mov [eax], edx                     ; 
 
 		; Write Payload (8 byte)
@@ -224,7 +226,7 @@ WriteBuffer db 4096 DUP(0)
 		
 		; (0x0C)
 		add eax, 04h 					;
-		mov ebx, dword ptr [Addr_WriteDataDescr]
+		mov ebx, dword ptr [LinearWriteBufferAddress]
 		mov [eax], ebx 					; Address of Buffer to Write
 
 		xor ebx, ebx 					; Zero Extra Buffer Pointers
@@ -639,7 +641,7 @@ WriteBuffer db 4096 DUP(0)
         add     ebx, edx
         and	    ebx, 0FFFFF000h
 	    add	    ebx, 1000h		; выровняли на границу 4 килобайт
-        mov     [Addr_DataDescr], ebx	; адрес линейный
+        mov     [LinearDataBufferAddress], ebx	; адрес линейный
 
         xor     eax, eax 
         xor     ebx, ebx
@@ -649,7 +651,7 @@ WriteBuffer db 4096 DUP(0)
         add     ebx, edx
         and	    ebx, 0FFFFF000h
 	    add	    ebx, 1000h		; выровняли на границу 4 килобайт
-        mov     [Addr_WriteDataDescr], ebx	; адрес линейный
+        mov     [LinearWriteBufferAddress], ebx	; адрес линейный
         
         ; Вычислить линейный адрес заголовка списка выровняв его по границе 16 байт
 	    ; теперь дескриптор будет выровнен по этой границе, но его нужно заново заполнить

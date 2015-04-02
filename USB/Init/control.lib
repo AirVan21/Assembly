@@ -32,6 +32,38 @@ qTDPingStateMsg			db "qTD Ping State $"
 qTDOkStateMsg			db "qTD is OK $"
 
 ; =====================================================================================================
+; Device Descriptor fields
+
+bLength					db 0h
+bDescriptorType			db 0h
+bcdUSB					dw 0h
+bDeviceClass			db 0h 
+bDeviceSubclass			db 0h 
+bDeviceProtocol			db 0h 
+bMaxPacketSize			db 0h
+idVendor				dw 0h 
+idProduct 				dw 0h 
+bcdDevice				dw 0h 
+iManufacturer 			db 0h
+iProduct 				db 0h
+iSerialNumber			db 0h 
+bNumConfigurations		db 0h 
+
+; =====================================================================================================
+; Device Descriptor Strings
+
+bDescriptorTypeMsg		db "Descriptor (0x01)   = $"
+bcdUSBMsg				db "USB Specification   = $"
+bDeviceClassMsg			db "Device Class        = $"
+bDeviceSubclassMsg		db "Device Subclass     = $"
+bDeviceProtocolMsg		db "Device Protocol     = $"
+bMaxPacketSizeMsg		db "Max Packet Size     = $"
+
+; =====================================================================================================
+; 09h | 00h | 00h => Full speed Hub
+; 09h | 00h | 01h => Hi-speed hub with single TT
+; 09h | 00h | 02h => Hi-speed hub with multiple TTs
+; =====================================================================================================
 	
 	; Prints information about qTD Status
 	;
@@ -82,5 +114,111 @@ qTDOkStateMsg			db "qTD is OK $"
 
 	endp
 
+	; Fills fields of Device Descriptor in mem 
+	; 
+	; ESI - Linear Address of Buffer where Device Descriptor is stotred
+	retrieveDeviceDescriptor proc near 
+
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		xor eax, eax 			;
+		lea eax, bLength		; 
+
+		mov ebx, fs:[esi]		;
+		mov [eax], ebx 			; 
+		mov ebx, fs:[esi + 4]	;
+		mov [eax + 4], ebx 		; 
+		mov ebx, fs:[esi + 8]	;
+		mov [eax + 8], ebx 		;
+
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp
+
+	; Prints Device Descriptor fields 
+	;
+	printDeviceDescriptor proc near
+		
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+
+		; bDescriptorType
+		mov ah, 09h				
+		lea dx, bDescriptorTypeMsg
+		int 21h 
+		xor bx, bx 
+		mov bl, [bDescriptorType]
+		push bx 
+		call printWordFromStackRM
+		call printSpaceRM
+
+		; bcdUSB
+		mov ah, 09h				
+		lea dx, bcdUSBMsg
+		int 21h 
+		xor bx, bx
+		mov bx, [bcdUSB]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+
+		; bDeviceClass
+		mov ah, 09h				
+		lea dx, bDeviceClassMsg
+		int 21h 
+		xor bx, bx 
+		mov bl, [bDeviceClass]
+		push bx 
+		call printWordFromStackRM
+		call printSpaceRM
+
+		; bMaxPacketSize
+		mov ah, 09h				
+		lea dx, bMaxPacketSizeMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [bMaxPacketSize]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+
+		; bDeviceSubclass
+		mov ah, 09h				
+		lea dx, bDeviceSubclassMsg
+		int 21h 
+		xor bx, bx 
+		mov bl, [bDeviceSubclass]
+		push bx 
+		call printWordFromStackRM
+		call printSpaceRM
+
+		; bDeviceProtocol
+		mov ah, 09h				
+		lea dx, bDeviceProtocolMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [bDeviceProtocol]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp 
 
 endm
