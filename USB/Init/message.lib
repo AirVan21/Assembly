@@ -23,7 +23,11 @@ bmRequestTypeOffset       = 0
 bRequestOffset 			  = 1
 wValueOffset			  = 2
 wIndexOffset			  = 4
-wLengthOffset 			  = 6   
+wLengthOffset 			  = 6 
+
+; QH Endpoint characteristics  
+;
+QHEndpointParam			dd 5040E000h
 
 ; =====================================================================================================
 
@@ -269,12 +273,12 @@ WriteBuffer db 4096 DUP(0)
 		add eax, edx                    ; 
 		mov ebx, eax				    ;
 		or ebx, 02h						; 
-		mov eax, dword ptr [QHAddressInMem] ;
+		mov eax, dword ptr [QHAddressInMem] 
 		mov [eax], ebx        		    ; 2-nd bit shows that this is QH
 
 		; Endpoint characteristics (0x04)
 		add eax, 4                      ;
-		mov ebx, 5040E000h				;
+		mov ebx, [QHEndpointParam]		;
 		mov [eax], ebx    		        ; (0x400 - max packet size [26:16])
 
 		; Transaction information (0x08)

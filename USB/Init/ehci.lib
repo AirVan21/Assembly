@@ -54,7 +54,11 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call Wait05s
 		call updatePORTstateReset
 
+		; GET_DESCRIPTOR (Device)
 		call getDeviceDescTransaction
+		; Update Max Packet Size 
+		call updateEndpointParamInQH
+		;Enumerate Devices 
 
 		;call printQTDStatus
 		
@@ -483,52 +487,6 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	
 	endp
 
-	; Updates information about HC Ports from PORTSC Registers  
-	; 
-	testPortFunctions proc 
-
-		push ebx           		 ; Save Registers  
-		push eax           		 ; 
-		push ecx                 ;
-		push edi 				 ; 
-		;------------------------;
-
-		mov ebx, HCBaseAddress	 ; Base Address For HC 
-		mov edi, ebx 			 ; 
-		
-		add ebx, HCSPARAMSoffset ; 
-		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
-		and ecx, 000Fh 			 ; Set only N_PORTS Value 
-		
-								 ; CX - contains number of ports 
-
-		xor eax, eax 			 ;
-		mov ax, OperRegOff
-		add edi, eax  			 ; Pointer to Operational Registers
-		add edi, PORTSCoffset 	 ; 
-								 ; Counter = N_PORTS
-	  loopOnPORTTest:
-
-	  	mov eax, fs:[edi]		 ; PORTSC value  ;
-								 ; Terminating Reset Sequence
-		or  eax, 100h 			 ; Enable Port Power 
-		
-		mov fs:[edi], eax 		 ; Apply Changes
-
-	  	add edi, 04h             ; 32-bit step 
-	  	
-	  	loop loopOnPORTTest	 	 ; Loop 
-
-		;------------------------;
-		pop edi 				 ;
-		pop ecx                  ; 
-		pop eax                  ; Recover edi
-		pop ebx            		 ; Recover ebx 
-
-		ret 
-	
-	endp
-
 	; Timer (Should be rewritten)
 	;
 	proc Wait05s near
@@ -549,7 +507,8 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	
 	endp
 
-	; Perform GET_DESCRIPTOR (Device) transaction 
+	; Performs GET_DESCRIPTOR (Device) transaction 
+	; Prints main fields 
 	;
 	getDeviceDescTransaction proc near 
 		
@@ -583,6 +542,32 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 
 		ret 
 	
+	endp
+
+	; Updates Endpoint Characteristics (Max Packet Size) 
+	;
+	updateEndpointParamInQH proc near
+
+		push ebx           		 ; Save Registers  
+		push eax           		 ; 
+		;------------------------;
+
+		mov eax, [QHEndpointParam]
+		and eax, 0F800FFFFh		 ; Clear bits [26:16] 
+
+		xor ebx, ebx 			 ;
+		mov bl, [bMaxPacketSize] ; Gets updated Max Packet Length 
+		shl ebx, 16 			 ; Shifts MaxPacketSize 
+
+		add eax, ebx 			 ; Update QHEndpoint Characteristics Value
+		mov [QHEndpointParam], eax 
+	
+		;------------------------;
+		pop eax                  ; 
+		pop ebx            		 ; 
+
+		ret 
+
 	endp
 
 endm
