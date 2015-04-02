@@ -1,0 +1,86 @@
+initControlLib macro
+
+; =====================================================================================================
+; qTD Offsets
+
+qTDTokenOffset 			= 08h
+
+; =====================================================================================================
+; qTD Status CONSTS 
+
+qTDActiveStatus			= 80h
+qTDHaltedStatus			= 40h
+qTDBufferErrorStatus 	= 20h
+qTDBabbleStatus			= 10h
+qTDTransErrorStatus		= 08h
+qTDMisddedMFStatus		= 04h 
+qTDSplitTransStatus 	= 02h
+qTDPingStateStatus		= 01h 
+qTDOKStatus 			= 00h
+
+; =====================================================================================================
+; qTD Status Descriptions 	
+
+qTDActiveMsg			db "qTD is Active $"
+qTDHaltedMsg			db "qTD is Halted $"
+qTDBufferErrorMsg		db "qTD Buffer Error $"
+qTDBabbleMsg			db "qTD Babble Detected $"
+qTDTransErrorMsg		db "qTD Transaction Error $"
+qTDMisddedMFMsg			db "qTD Missed Micro-Frame $"
+qTDSplitTransMsg		db "qTD Split Transaction State $"
+qTDPingStateMsg			db "qTD Ping State $"
+qTDOkStateMsg			db "qTD is OK $"
+
+; =====================================================================================================
+	
+	; Prints information about qTD Status
+	;
+	printQTDStatus proc near
+
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+
+		mov ebx, [QTDAddress1]	; Address of qTD 
+		mov eax, [ebx + qTDTokenOffset]
+
+		cmp al,	qTDActiveStatus 
+		jz fillQTDActive		
+
+		cmp al,	qTDTransErrorStatus 
+		jz fillQTDTransError
+
+		cmp al,	qTDOKStatus 
+		jz fillQTDOK	 	 
+	  
+	  fillQTDActive:
+	  	lea dx, qTDActiveMsg	; Msg for qTD Active 
+	  	jmp exitPrintQTDStatus  ;
+
+	  fillQTDTransError:
+	  	lea dx, qTDTransErrorMsg; Msg for qTD qTDTransErrorMsg
+	  	jmp exitPrintQTDStatus  ;
+	  
+	  fillQTDOK:
+	  	lea dx, qTDOkStateMsg	; Msg for qTD Active 
+	  	jmp exitPrintQTDStatus  ;
+
+      exitPrintQTDStatus:
+      	
+      	mov ah, 09h             ;
+      	int 21h 
+
+      	call printNewLineRM
+
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp
+
+
+endm

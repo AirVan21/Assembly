@@ -377,58 +377,6 @@ WriteBuffer db 4096 DUP(0)
 	endp 
 
 	; Sets USBCMD (Asynch Queue) bit to ONE 
-	; 
-	; Wait Until transaction end 
-	runAQueueinCMD proc
-
-		push edx						; Save Register
-		push ebx 						; 
-
-		mov ebx, HCBaseAddress 		    ; Gets Base Address
-
-		xor edx, edx                    
-
-		mov dx, OperRegOff				; Offset for Operational Register
-		add ebx, edx                    ; USBCMD Base Address 
-
-		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		or edx, 20h   			        ; Clears Asynch Queue bit 
-		mov fs:[ebx], edx               ; Set updated value 
-
-										; Recover Register 
-		pop ebx 						;
-		pop edx 						; 
-
-		ret 
-	
-	endp 	 	 
-
-	; Sets USBCMD (Asynch Queue) bit to ZERO  
-	; 
-	; EBX - contains Base Address 
-	stopAQueueinCMD proc
-
-		push edx						; Save Register
-		push ebx 						; 
-
-		xor edx, edx                    
-
-		mov dx, OperRegOff				; Offset for Operational Register
-		add ebx, edx                    ; USBCMD Base Address 
-
-		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		and edx, 0ffffffdfh             ; Clears Asynch Queue bit 
-		mov fs:[ebx], edx               ; Set updated value 
-
-										; Recover Register 
-		pop ebx 						;
-		pop edx 						; 
-
-		ret 
-	
-	endp
-
-	; Sets USBCMD (Asynch Queue) bit to ONE 
 	; Wait Until Asyhch Queue is valid (transaction end)
 	; 
 	;
@@ -711,7 +659,7 @@ WriteBuffer db 4096 DUP(0)
         mov [QHAddressInMem], ebx		; адрес не линейный Начала Очереди
 	   
        									
-	    mov	eax, ebx 				   ; Calculate Pointer in qTD Array 
+	    mov	eax, ebx 				    ; Calculate Pointer in qTD Array 
 	    add	eax, 40h
 	    and	eax, 0FFFFFFF0h
 	    mov [QTDAddress1], eax  	    ; запись нелинейного адреса

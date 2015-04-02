@@ -4,7 +4,6 @@ initOperationalInfo macro
 ; =====================================================================================================
 ; Operational Registers Offsets
 
-
 USBCMDoffset   = 00h
 USBSTSoffset   = 04h
 USBINToffset   = 08h
@@ -18,9 +17,9 @@ PORTSCOffset   = 44h
 ; =====================================================================================================
 ; Operational Registers String CONSTS 
 
-USBCMDmsg 	 db "USBCMD Register     = $"
-USBSTSmsg 	 db "USBSTS Register     = $"
-USBINTmsg 	 db "USBINT Register     = $"
+USBCMDMsg 	 db "USBCMD Register     = $"
+USBSTSMsg 	 db "USBSTS Register     = $"
+USBINTMsg 	 db "USBINT Register     = $"
 FRINDEXMsg 	 db "FRINDEX Register    = $"
 CTRLDSMsg    db "CTRLDS Register     = $" 
 PListBaseMsg db "Periodic List Base  = $"
@@ -87,8 +86,6 @@ CONFIGReg			dd 0h
 		
 		push ebx           		 ; Save Registers  
 		push eax           		 ; 
-		push ecx                 ;
-		push edi                 ;
 		;------------------------;
 
 		mov ebx, HCBaseAddress	 ; Base Address for HC 
@@ -128,14 +125,67 @@ CONFIGReg			dd 0h
 		mov CONFIGReg, eax 	 	 ; Save CONFIG
 
 		;------------------------;
-		pop edi 				 ;
-		pop ecx                  ; 
-		pop eax                  ; Recover edi
-		pop ebx            		 ; Recover ebx 
+		pop eax                  ; 
+		pop ebx            		 ; Recover
 
 		ret 
 
 	endp
 
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; 
+	; Wait Until transaction end 
+	runAQueueinCMD proc
+
+		push edx						; Save Register
+		push ebx 						; 
+		;-------------------------------;
+
+		mov ebx, HCBaseAddress 		    ; Gets Base Address
+
+		xor edx, edx                    
+
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Base Address 
+
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		or edx, 20h   			        ; Clears Asynch Queue bit 
+		mov fs:[ebx], edx               ; Set updated value 
+		;-------------------------------;
+										; Recover Register 
+		pop ebx 						;
+		pop edx 						; 
+
+		ret 
+	
+	endp 	 	 
+
+	; Sets USBCMD (Asynch Queue) bit to ZERO  
+	; 
+	; EBX - contains Base Address 
+	stopAQueueinCMD proc
+
+		push edx						; Save Register
+		push ebx 						; 
+		;-------------------------------;              
+
+		mov ebx, HCBaseAddress 		    ; Gets Base Address
+		
+		xor edx, edx     
+		
+		mov dx, OperRegOff				; Offset for Operational Register
+		add ebx, edx                    ; USBCMD Base Address 
+
+		mov edx, fs:[ebx]               ; Gets USBCMD Register 
+		and edx, 0ffffffdfh             ; Clears Asynch Queue bit 
+		mov fs:[ebx], edx               ; Set updated value 
+		;-------------------------------;
+										; Recover Register 
+		pop ebx 						;
+		pop edx 						; 
+
+		ret 
+	
+	endp
 
 endm

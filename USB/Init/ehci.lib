@@ -14,6 +14,7 @@ USBLEGCTLSTSReg 	dd 0h
 ; Paragraph style 
 FrameAddress 		dw 0h
 AlignedFrameAddress dw 0h  
+
 ; =====================================================================================================
 ; CONSTS 
 
@@ -26,9 +27,6 @@ USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
 sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
 sHCInitDone 	 db "HC Init Done", 13, 10, "$"
-
-
-
 
 ; =====================================================================================================
 
@@ -64,11 +62,25 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call Wait05s
 		call stopAQueueinCMD
 
+		call printQTDStatus
+		
+		;DUMP 
+		;call printTDArrayDump
+		;call printOutBufferDump
+		;call printInBufferDump
+
 		; DEBUG 
 		;call updateOperRegInfo
 		;call printOperRegInfo
+		;call printNewLineRM
+		;call printPORTSCinfo
 		;call updateCapRegInfo
 		;call printCapRegInfo
+		;call printNewLineRM
+		;call retrieveLegacyInterruptsEHCI
+		;call printUSBLEGSUPReg
+
+		;call printTDArrayDump
 		
 		; In Transaction
 		call createQueueHead
@@ -78,8 +90,15 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call Wait05s 
 		call stopAQueueinCMD
 		
+		call printQTDStatus
+		
+		call printTDArrayDump
 		call printOutBufferDump
 
+		;call testPortFunctions
+		;call Wait05s 
+		;call updatePORTstateReset
+  		
   		;------------------------;
   		pop esi 				 ;
 		pop edi                  ; 
@@ -281,47 +300,6 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	
 	endp
 
-	; Prints Info about Legacy Registers 
-	; Registers should be retrieved earlier
-	; 
-	printUSBIntMonitor proc near
-		
-		push eax           		 ; Save 
-		push edx                 ;
-		;------------------------; 
-
-		lea dx, USBLEGSUPmsg     ; USBLEGSUP Register 
-		mov ah, 09h 			 ;
-		int 21h 
-		
-		mov eax, USBLEGSUPReg	 ; Prints USBLEGSUP Register 
-		push ax
-		shr eax, 16  
-		push ax 
-		call printWordFromStackRM
-		call printWordFromStackRM	
-
-		call printNewLineRM
-
-		lea dx, USBLEGCTLSmsg    ; USBLEGSUP Register 
-		mov ah, 09h 			 ;
-		int 21h 
-
-		mov eax, USBLEGCTLSTSReg ; Prints USBLEGCTLSTS Register 
-		push ax
-		shr eax, 16  
-		push ax 
-		call printWordFromStackRM
-		call printWordFromStackRM	
-
-		;------------------------;
-		pop edx                  ; 
-		pop eax                  ;  Recover  
-
-		ret 
-
-	endp
-
 	; Sets HC OS ownership bit to one 
 	; Waits until HC BIOS ownership bit is zero 
 	; 
@@ -497,11 +475,55 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 								 ; Terminating Reset Sequence
 		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
 		mov fs:[edi], eax 		 ; Apply Changes
-      
-      testNextPORTstateReset:
 
 	  	add edi, 04h             ; 32-bit step 
 	  	loop loopOnPORTstateReset; Loop 
+
+		;------------------------;
+		pop edi 				 ;
+		pop ecx                  ; 
+		pop eax                  ; Recover edi
+		pop ebx            		 ; Recover ebx 
+
+		ret 
+	
+	endp
+
+	; Updates information about HC Ports from PORTSC Registers  
+	; 
+	testPortFunctions proc 
+
+		push ebx           		 ; Save Registers  
+		push eax           		 ; 
+		push ecx                 ;
+		push edi 				 ; 
+		;------------------------;
+
+		mov ebx, HCBaseAddress	 ; Base Address For HC 
+		mov edi, ebx 			 ; 
+		
+		add ebx, HCSPARAMSoffset ; 
+		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
+		and ecx, 000Fh 			 ; Set only N_PORTS Value 
+		
+								 ; CX - contains number of ports 
+
+		xor eax, eax 			 ;
+		mov ax, OperRegOff
+		add edi, eax  			 ; Pointer to Operational Registers
+		add edi, PORTSCoffset 	 ; 
+								 ; Counter = N_PORTS
+	  loopOnPORTTest:
+
+	  	mov eax, fs:[edi]		 ; PORTSC value  ;
+								 ; Terminating Reset Sequence
+		or  eax, 100h 			 ; Enable Port Power 
+		
+		mov fs:[edi], eax 		 ; Apply Changes
+
+	  	add edi, 04h             ; 32-bit step 
+	  	
+	  	loop loopOnPORTTest	 	 ; Loop 
 
 		;------------------------;
 		pop edi 				 ;

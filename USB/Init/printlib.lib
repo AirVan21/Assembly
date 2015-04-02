@@ -7,6 +7,8 @@ hex_table db "0123456789ABCDEF"
 newline   db " ", 13, 10, "$"
 space     db " : $"
 
+; =====================================================================================================
+
 PortValue:
 
 	dd 00h
@@ -67,7 +69,8 @@ PortValue:
 		lea bx, hex_table      ; Load in bx char table
 		mov si, 12             ; Shift counter
 
-	cyclePWFSRM:
+	  cyclePWFSRM:
+		
 		mov ax, di             ; Set default value
 		push cx                ; Save counter
 		mov cx, si             ; Shift value
@@ -79,6 +82,7 @@ PortValue:
 		int 21h                ; 
 		sub si, 4              ;
 		pop cx                 ;
+		
 		loop cyclePWFSRM       ;
 	
 		pop cx                 ; Restore registers
@@ -180,7 +184,9 @@ PortValue:
 		ret                    ;
 	
 	endp
-
+	
+	; Prints CRLF escape codes  
+	;
 	printNewLineRM proc near
 
 		push ax 				; Save Registers 
@@ -197,13 +203,15 @@ PortValue:
 
 	endp
 
+	; Prints space with delimeter  
+	;
 	printSpaceRM proc near
 
 		push ax 				; Save Registers 
 		push dx 
 
 		mov ah, 09h             ; Print String Function 
-		lea dx, space         ; DX - address of new line string 
+		lea dx, space         	; DX - address of new line string 
 		int 21h                 ; MS-DOS call 
 
 		pop dx 					; Recover Registers
@@ -213,9 +221,9 @@ PortValue:
 
 	endp
 
-	; Prints information about HC Ports from PORTSC Registers  
+	; Retrieves information about HC Ports from PORTSC Registers  
 	;
-	printPORTSCinfo proc 
+	printPORTSCinfo proc near
 
 		push ebx           		 ; Save Registers  
 		push eax           		 ; 
@@ -239,6 +247,8 @@ PortValue:
 		add edi, eax  			 ; Pointer to Operational Registers
 		add edi, PORTSCoffset 	 ; 
 								 ; Counter = N_PORTS
+		mov cx, 7
+
 	  loopOnPORTs:
 
 	  	mov eax, fs:[edi]		 ; PORTSC value 
@@ -261,6 +271,9 @@ PortValue:
 	
 	endp
 
+	; Prints Port Data from Port Value Array 
+	; Called in printPORTSCinfo 
+	; 
 	invokePortPrinter proc near
 
 		push edx           		 ; Save Registers  
@@ -303,8 +316,7 @@ PortValue:
 		pop edx            		 ; Recover 
 
 		ret 
-
-
+		
 	endp
 
 
@@ -399,6 +411,47 @@ PortValue:
 		pop edx 				;
 
 		ret
+
+	endp
+
+	; Prints Info about Legacy Registers 
+	; Registers should be retrieved earlier
+	; 
+	printUSBLEGSUPReg proc near
+		
+		push eax           		 ; Save 
+		push edx                 ;
+		;------------------------; 
+
+		lea dx, USBLEGSUPmsg     ; USBLEGSUP Register 
+		mov ah, 09h 			 ;
+		int 21h 
+		
+		mov eax, USBLEGSUPReg	 ; Prints USBLEGSUP Register 
+		push ax
+		shr eax, 16  
+		push ax 
+		call printWordFromStackRM
+		call printWordFromStackRM	
+
+		call printNewLineRM
+
+		lea dx, USBLEGCTLSmsg    ; USBLEGSUP Register 
+		mov ah, 09h 			 ;
+		int 21h 
+
+		mov eax, USBLEGCTLSTSReg ; Prints USBLEGCTLSTS Register 
+		push ax
+		shr eax, 16  
+		push ax 
+		call printWordFromStackRM
+		call printWordFromStackRM	
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ;  Recover  
+
+		ret 
 
 	endp 
 

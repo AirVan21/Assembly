@@ -1,35 +1,64 @@
  initCapacityInfo macro
 
 ; =====================================================================================================
+; Capacity Registers Offsets
 
-HCIVERSIONoffset	= 02h
-HCSPARAMSoffset 	= 04h 
-HCCPARAMSoffset 	= 08h
+CAPLENGTHOffset		= 00h
+HCIVERSIONOffset	= 02h
+HCSPARAMSOffset 	= 04h 
+HCCPARAMSOffset 	= 08h
+HCSPPORTROUTEOffset = 0Ch
 
 
 ; =====================================================================================================
+; Capacity Registers String CONSTS 
 
+CAPLENGTHMsg	 db "CAPLENGTH | Version    = $"
+HCSPARAMSMsg 	 db "HCSPARAMS   Register   = $"
+HCCPARAMSMsg 	 db "HCCPARAMS   Register   = $"
+HCSPPORTROUTEMSg db "HCSPPORTROUT Register  = $"
+
+; =====================================================================================================
+; Capacity Registers Table
+
+CAPLENGTHReg		dd 00h ; With HCIVERSIONTReg 
+HCSPARAMSReg		dd 00h
+HCCPARAMSReg		dd 00h
+HCSPPORTROUTEReg 	dd 00h
+
+; =====================================================================================================
 
  	; Prints information about HC Capacity I/O Registers 
 	;
-	; EBX - contains BAR address
-	; EDI - contains Video Mem offset (where to print) | Should be the start of the row 
 	; FS  - contains Selector For Zero Memory
-	; ES  - contains Video Memory Selector
-	printEHCICapInfo proc near
+	printCapRegInfo proc near
 
 		push ebx           		; Save ebx
-		push edi           		; Is Used for BAR Storage 
 		push edx                ; 
 		push eax                ;
 		;------------------------
 		
-		mov edi, ebx            ; Base Address Here 
-
-		; Show HC Base Address
-		lea dx, HCGreet  		; Address HC string
+		; Show СAPLENGTH
+		lea dx, CAPLENGTHMsg  	; 
 		mov ah, 09
-		int 21h					; Print HC string
+		int 21h					; Print string
+
+		mov ebx, [CAPLENGTHReg] ; 
+		
+		push bx 				; Saves Low Part
+		shr ebx, 16             ; Gets Significant Part
+		push bx					; Prints Base Address
+		call printWordFromStackRM
+		call printWordFromStackRM		
+
+		call printNewLineRM 	; Points to the new line 
+
+		; Show HCSPARAMSM
+		lea dx, HCSPARAMSMsg  	; 
+		mov ah, 09
+		int 21h					; Print string
+
+		mov ebx, [HCSPARAMSReg] ; 
 		
 		push bx 				; Saves Low Part
 		shr ebx, 16             ; Gets Significant Part
@@ -39,63 +68,44 @@ HCCPARAMSoffset 	= 08h
 
 		call printNewLineRM 	; Points to the new line 
 		
-		; Work with CAPLENGTH
-		lea dx, CapLenMsg  		; Address for CapLenMsg
+		; Work with HCCPARAMSReg
+		lea dx, HCCPARAMSMsg  	; Address for HCCPARAMSMsg 
 		mov ah, 09h             ; Print string function
 		int 21h                 ;
-		mov ebx, edi            ; Base Address 
-		call retrieveCAPLENGTH  ; Write CAPLENGTH for BAR1
+		mov ebx, [HCCPARAMSReg] ; 
+
+		push bx 				; Saves Low Part
+		shr ebx, 16             ; Gets Significant Part
+		push bx					; Prints Base Address
+		call printWordFromStackRM
+		call printWordFromStackRM	
+
+		call printNewLineRM 	; Points to the new line 
+
+		; Show HCSPPORTROUTE
+		lea dx, HCSPPORTROUTEMSg; 
+		mov ah, 09
+		int 21h					; Print string
+
+		mov ebx, [HCSPPORTROUTEReg] 
+		
+		push bx 				; Saves Low Part
+		shr ebx, 16             ; Gets Significant Part
+		push bx					; Prints Base Address
+		call printWordFromStackRM
+		call printWordFromStackRM		
 
 		call printNewLineRM 	; Points to the new line 
 		
-		; Work with HCIVERSION 
-		lea dx, HCVersion  		; Address for HCVersion
-		mov ah, 09h             ; Print string function
-		int 21h                 ;
-		mov ebx, edi            ; Base Address 		
-		call retrieveHCIVERSION ; Write HCVersion for BAR1
-		
-		call printNewLineRM 	; Points to the new line 
-
-		; Work with HCSPARAMS 
-		lea dx, N_PORTS  		; Address for N_PORTS
-		mov ah, 09h             ; Print string function
-		int 21h                 ;
-		mov ebx, edi            ; Base Address
-		call retrieveHCSPARAMS  ; Write N_PORTS for BAR1
-
-		call printNewLineRM 	; Points to the new line 
-		
+        ;-----------------------;
         pop eax                 ; 
         pop edx                 ;
-        pop edi                 ;
         pop ebx                 ;
         
         ret
 
     endp
 	
-	; Retieves and prints CAPLENGTH
-	;
-	; EBX - contains Base Address (BAR)
-	; FS  - is used for Addressing 
-	retrieveCAPLENGTH proc near
-
-		push ax			   		; Save ax
-		
-		xor ax, ax              ;
-
-		mov al, fs:[ebx]   		;   
-						   		; Prints CAPLENGTH
-		push ax            		; CAPLENGTH1
-		mov OperRegOff, ax      ; 
-		call printWordFromStackRM
-		
-		pop ax  
- 
-		ret
-	endp
-
 	; Retieves and prints EHCI Revision number 
 	;
 	; EBX - contains Base Address (BAR)
@@ -117,28 +127,36 @@ HCCPARAMSoffset 	= 08h
 		ret
 	endp
 
-	; Retieves and prints EHCI HCSPARAMS register 
-	; (In this case Number of ports for current HC)
+	; Updates information about Capacity Registres in Memory  
 	;
-	; EBX - contains Base Address (BAR)
-	; FS  - is used for Addressing 
-	retrieveHCSPARAMS proc near
+	updateCapRegInfo proc near
 		
-		push ax			   	    ; Save ax
-		push ebx           		; Save ebx 
+		push ebx           		 ; Save Registers  
+		push eax           		 ;
+		push ecx 				 ;  
+		;------------------------;
+
+		mov ebx, HCBaseAddress	 ; Base Address for HC
 		
-		add ebx, 4         		; Offset for HCSPARAMS 
-		mov eax, dword ptr fs:[ebx]  ;   
-						   		; Prints Num Of Ports 
-		and ax, 0Fh             ; Only last 4 bits are needed
-		push ax            		; 
-		call printWordFromStackRM
+		mov eax, fs:[ebx + CAPLENGTHOffset]
+		mov [CAPLENGTHReg], eax  ; Save CAPLENGTH + HCIVersion
+
+		mov eax, fs:[ebx + HCSPARAMSOffset]
+		mov [HCSPARAMSReg], eax  ; Save HCSPARAMS Register
+
+		mov eax, fs:[ebx + HCCPARAMSOffset]
+		mov [HCCPARAMSReg], eax  ; Save HCCPARAMS Register
+
+	    mov eax, fs:[ebx + HCSPPORTROUTEOffset]
+	    mov [HCSPPORTROUTEReg], eax 
+
+		;------------------------;
+		pop ecx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; 
 		
-		pop ebx          
-		pop ax             		; Recover registers
- 		
-		ret
-	
-	endp
+		ret 
+
+	endp 
 
 endm

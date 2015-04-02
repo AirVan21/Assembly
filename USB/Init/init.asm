@@ -5,6 +5,7 @@
 	include ehciOper.lib 
 	include message.lib
 	include pciconf.lib
+	include control.lib
 	USBCode segment use16
 	assume	cs:USBCode, ds:USBCode, es:USBCode
 	.386p
@@ -55,6 +56,7 @@ initOperationalInfo
 messageLib
 initCapacityInfo
 initPCIConfig
+initControlLib
 
 ; =====================================================================================================
 
