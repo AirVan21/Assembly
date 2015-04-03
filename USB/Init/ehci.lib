@@ -514,7 +514,8 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	;
 	getDeviceDescTransaction proc near 
 		
-		push esi 				 ; 
+		push esi 				 ;
+		push eax 				 ; 
 		;------------------------;
 
 		; Setup Transaction
@@ -527,6 +528,8 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printQTDStatus
 
 		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
 		call createQueueHead
 		call createInQTD
 		call runAQueueinCMD
@@ -540,6 +543,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printDeviceDescriptor
 
 		;------------------------;
+		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
 		ret 
@@ -552,6 +556,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	setDeviceAddrTransaction proc near 
 		
 		push esi 				 ; 
+		push eax 				 ;
 		;------------------------;
 		
 		; Increments Device Address
@@ -565,10 +570,8 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printQTDStatus
 
 		; Get Zero IN Packet
-		mov eax, [InQTDToken]	 ;
-		and eax, 8000FFFFh 		 ; Clear Total Bytes to Transfer field 
-		mov [InQTDToken], eax 	 ;
-
+		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
+		mov [InBytes], ax             ; 
 		call createQueueHead
 		call createInQTD
 		call runAQueueinCMD
@@ -577,6 +580,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printQTDStatus 
 		
 		;------------------------;
+		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
 		ret 

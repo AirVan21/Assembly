@@ -101,7 +101,22 @@ InQTDToken				dd 80120180h
 ;
 OutQTDToken				dd 0h  
 
-; =====================================================================================================            			
+; ===================================================================================================== 
+; Paramenters for Current Configuration 
+
+; Current Device Address
+; 
+ValidDeviceAddress		db 0h 
+
+; Current Endpoint
+;
+ValidEndpoint			db 0h 
+
+; Bytes Parameter for IN Transaction 
+;
+InBytes					dw 0h 
+
+; ===================================================================================================== 
 
 FrameListBaseAddr dw 0 	;FrameListBase
 
@@ -223,8 +238,13 @@ WriteBuffer db 4096 DUP(0)
 		mov [eax], ebx 					; ZERO field 
 		
 		; (0x08)
+		xor edx, edx 					; 
+		mov dx, [InBytes]				; Bytes to transfer for IN Transaction
+		shl edx, 16 					; [30:16] = bytes to transfer
 		add eax, 04h 					;
 		mov ebx, dword ptr [InQTDToken] ; [31] = 1 In Packet; [14:12] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
+		and ebx, 8000FFFFh 		 		; Clear Total Bytes to Transfer field 
+		add ebx, edx 					; Set Appropriate Byte Amount
 		mov [eax], ebx					; [30:16] = bytes to transfer 
 		
 		; (0x0C)
