@@ -79,7 +79,7 @@ GetStrDescReq64 		db 80h, 6
 ; Set Device Address Request (First Address is 1)  
 ;
 SetDeviceAddrReq  		db 0,5
-             			dw 1,0,0
+             			dw 0,0,0
 
 ; Get Configuration Request
 ;
@@ -160,8 +160,7 @@ WriteBuffer db 4096 DUP(0)
 
 		; qTD token (0x08)                   
 		add eax, 4                        ; 
-		;mov edx, dword ptr [SetupQTDToken]; 8 byte Payload [30:16] | Setup PID | Active bit 
-		mov edx, dword ptr [SetupQTDToken];		
+		mov edx, dword ptr [SetupQTDToken]; 8 byte Payload [30:16] | Setup PID | Active bit 
 		mov [eax], edx                    ; 
 
 		; qTD Buffer Pointer list

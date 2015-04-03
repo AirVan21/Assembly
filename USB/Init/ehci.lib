@@ -58,6 +58,8 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call getDeviceDescTransaction
 		; Update Max Packet Size 
 		call updateEndpointParamInQH
+		; Set Device Address
+		call setDeviceAddrTransaction
 		;Enumerate Devices 
 
 		;call printQTDStatus
@@ -538,12 +540,49 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printDeviceDescriptor
 
 		;------------------------;
-		pop esi            		 ; Recover ebx 
+		pop esi            		 ; Recover 
 
 		ret 
 	
 	endp
+	
+	; Performs SET_ADDRESS (Device) transaction 
+	; 
+	;
+	setDeviceAddrTransaction proc near 
+		
+		push esi 				 ; 
+		;------------------------;
+		
+		; Increments Device Address
+		inc [SetDeviceAddrReq + 2]
+		call createQueueHead
+		lea esi, SetDeviceAddrReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
 
+		; Get Zero IN Packet
+		mov eax, [InQTDToken]	 ;
+		and eax, 8000FFFFh 		 ; Clear Total Bytes to Transfer field 
+		mov [InQTDToken], eax 	 ;
+
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus 
+		
+		;------------------------;
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+	
 	; Updates Endpoint Characteristics (Max Packet Size) 
 	;
 	updateEndpointParamInQH proc near
@@ -556,7 +595,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		and eax, 0F800FFFFh		 ; Clear bits [26:16] 
 
 		xor ebx, ebx 			 ;
-		mov bl, [bMaxPacketSize] ; Gets updated Max Packet Length 
+		mov bl, [DDbMaxPacketSize]; Gets updated Max Packet Length 
 		shl ebx, 16 			 ; Shifts MaxPacketSize 
 
 		add eax, ebx 			 ; Update QHEndpoint Characteristics Value
