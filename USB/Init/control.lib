@@ -18,6 +18,10 @@ qTDSplitTransStatus 	= 02h
 qTDPingStateStatus		= 01h 
 qTDOKStatus 			= 00h
 
+qTDSetupTokenType		= 10b
+qTDInTokenType			= 01b
+qTDOutTokenType			= 00b 
+
 ; =====================================================================================================
 ; qTD Status Descriptions 	
 
@@ -31,38 +35,56 @@ qTDSplitTransMsg		db "qTD Split Transaction State $"
 qTDPingStateMsg			db "qTD Ping State $"
 qTDOkStateMsg			db "qTD is OK $"
 
-; =====================================================================================================
-; Device Descriptor fields
+qTDSetupTokenMsg 		db "Setup Token $"
+qTDInTokenMsg			db "In Token    $"
+qTDOutTokenMsg			db "Out Token   $"
 
-bLength					db 0h
-bDescriptorType			db 0h
-bcdUSB					dw 0h
-bDeviceClass			db 0h 
-bDeviceSubclass			db 0h 
-bDeviceProtocol			db 0h 
-bMaxPacketSize			db 0h
-idVendor				dw 0h 
-idProduct 				dw 0h 
-bcdDevice				dw 0h 
-iManufacturer 			db 0h
-iProduct 				db 0h
-iSerialNumber			db 0h 
-bNumConfigurations		db 0h 
+; =====================================================================================================
+; Device Descriptor (DD) fields
+
+DDbLength				db 0h
+DDbDescriptorType		db 0h
+DDbcdUSB				dw 0h
+DDbDeviceClass			db 0h 
+DDbDeviceSubclass		db 0h 
+DDbDeviceProtocol		db 0h 
+DDbMaxPacketSize		db 0h
+DDidVendor				dw 0h 
+DDidProduct 			dw 0h 
+DDbcdDevice				dw 0h 
+DDiManufacturer 		db 0h
+DDiProduct 				db 0h
+DDiSerialNumber			db 0h 
+DDbNumConfigurations	db 0h 
 
 ; =====================================================================================================
 ; Device Descriptor Strings
 
-bDescriptorTypeMsg		db "Descriptor (0x01)   = $"
-bcdUSBMsg				db "USB Specification   = $"
-bDeviceClassMsg			db "Device Class        = $"
-bDeviceSubclassMsg		db "Device Subclass     = $"
-bDeviceProtocolMsg		db "Device Protocol     = $"
-bMaxPacketSizeMsg		db "Max Packet Size     = $"
+DDbDescriptorTypeMsg		db "Descriptor (0x01)   = $"
+DDbcdUSBMsg					db "USB Specification   = $"
+DDbDeviceClassMsg			db "Device Class        = $"
+DDbDeviceSubclassMsg		db "Device Subclass     = $"
+DDbDeviceProtocolMsg		db "Device Protocol     = $"
+DDbMaxPacketSizeMsg			db "Max Packet Size     = $"
 
 ; =====================================================================================================
-; 09h | 00h | 00h => Full speed Hub
-; 09h | 00h | 01h => Hi-speed hub with single TT
-; 09h | 00h | 02h => Hi-speed hub with multiple TTs
+; Hub Descriptor (HD) fields
+
+HDbLength				db 0h
+HDbDescriptorType		db 0h
+HDbNbrPorts				db 0h 
+HDwHubCharact			dw 0h 
+
+; =====================================================================================================
+; Hub Descriptor Strings
+
+HDbDescriptorTypeMsg		db "Descriptor (0x29)   = $"
+HDbNbrPortsMsg 				db "Amount of ports     = $"
+
+; =====================================================================================================
+; 09h | 00h | 00h => Class | Subclass | Protocol => Full speed Hub
+; 09h | 00h | 01h => Class | Subclass | Protocol => Hi-speed hub with single TT
+; 09h | 00h | 02h => Class | Subclass | Protocol => Hi-speed hub with multiple TTs
 ; =====================================================================================================
 	
 	; Prints information about qTD Status
@@ -74,14 +96,67 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 		push eax                ;
 		;------------------------
 
-		mov ebx, [QTDAddress1]	; Address of qTD 
+		; Announce Message type 
+		mov ebx, [QTDAddress1]	
+		mov eax, [ebx + qTDTokenOffset]
+		shr eax, 8 
+
+		cmp al, qTDSetupTokenType
+		jz fillQTDSetupToken
+
+		cmp al, qTDInTokenType
+		jz fillQTDInToken
+
+		cmp al, qTDOutTokenType
+		jz fillQTDOutToken
+
+	  fillQTDSetupToken:
+	  	lea dx, qTDSetupTokenMsg
+	  	jmp checkQTDStatus
+
+	  fillQTDInToken:
+	  	lea dx, qTDInTokenMsg
+	  	jmp checkQTDStatus
+
+	  fillQTDOutToken:
+	  	lea dx, qTDOutTokenMsg
+	  	jmp checkQTDStatus    
+  
+      checkQTDStatus:
+
+      	mov ah, 09h             
+      	int 21h 
+
+      	lea dx, space 
+      	int 21h 
+		
+		; Announce Message Status  
+		mov ebx, [QTDAddress1]	
 		mov eax, [ebx + qTDTokenOffset]
 
 		cmp al,	qTDActiveStatus 
-		jz fillQTDActive		
+		jz fillQTDActive
+
+		cmp al,	qTDHaltedStatus
+		jz fillQTDHalted
+
+		cmp al,	qTDBufferErrorStatus
+		jz fillBufferError
+		
+		cmp al, qTDBabbleStatus
+		jz fillQTDBabble
 
 		cmp al,	qTDTransErrorStatus 
 		jz fillQTDTransError
+		
+		cmp al, qTDMisddedMFStatus
+		jz fillQTDMisddedMF	
+
+		cmp al, qTDSplitTransStatus
+		jz fillQTDSplitTrans	
+		
+		cmp al, qTDPingStateStatus
+		jz fillQTDPingState
 
 		cmp al,	qTDOKStatus 
 		jz fillQTDOK	 	 
@@ -90,9 +165,33 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 	  	lea dx, qTDActiveMsg	; Msg for qTD Active 
 	  	jmp exitPrintQTDStatus  ;
 
+	  fillQTDHalted:
+	  	lea dx, qTDHaltedMsg
+	    jmp exitPrintQTDStatus
+	  
+	  fillBufferError:
+	  	lea dx, qTDBufferErrorMsg
+	    jmp exitPrintQTDStatus
+
+	  fillQTDBabble:
+	  	lea dx, qTDBabbleMsg
+	    jmp exitPrintQTDStatus
+
 	  fillQTDTransError:
 	  	lea dx, qTDTransErrorMsg; Msg for qTD qTDTransErrorMsg
 	  	jmp exitPrintQTDStatus  ;
+
+	  fillQTDMisddedMF:
+	  	lea dx, qTDMisddedMFMsg
+	    jmp exitPrintQTDStatus
+	  
+	  fillQTDSplitTrans:
+	    lea dx, qTDSplitTransMsg
+	    jmp exitPrintQTDStatus
+
+	  fillQTDPingState:
+	    lea dx, qTDPingStateMsg
+	    jmp exitPrintQTDStatus
 	  
 	  fillQTDOK:
 	  	lea dx, qTDOkStateMsg	; Msg for qTD Active 
@@ -116,7 +215,7 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 
 	; Fills fields of Device Descriptor in mem 
 	; 
-	; ESI - Linear Address of Buffer where Device Descriptor is stotred
+	; ESI - Linear Address of Buffer where Device Descriptor is stored
 	retrieveDeviceDescriptor proc near 
 
 		push ebx           		; Save ebx
@@ -125,7 +224,7 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 		;------------------------
 		
 		xor eax, eax 			;
-		lea eax, bLength		; 
+		lea eax, DDbLength		; 
 
 		mov ebx, fs:[esi]		;
 		mov [eax], ebx 			; 
@@ -154,60 +253,60 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 
 		; bDescriptorType
 		mov ah, 09h				
-		lea dx, bDescriptorTypeMsg
+		lea dx, DDbDescriptorTypeMsg
 		int 21h 
 		xor bx, bx 
-		mov bl, [bDescriptorType]
+		mov bl, [DDbDescriptorType]
 		push bx 
 		call printWordFromStackRM
 		call printSpaceRM
 
 		; bcdUSB
 		mov ah, 09h				
-		lea dx, bcdUSBMsg
+		lea dx, DDbcdUSBMsg
 		int 21h 
 		xor bx, bx
-		mov bx, [bcdUSB]
+		mov bx, [DDbcdUSB]
 		push bx 
 		call printWordFromStackRM
 		call printNewLineRM
 
 		; bDeviceClass
 		mov ah, 09h				
-		lea dx, bDeviceClassMsg
+		lea dx, DDbDeviceClassMsg
 		int 21h 
 		xor bx, bx 
-		mov bl, [bDeviceClass]
+		mov bl, [DDbDeviceClass]
 		push bx 
 		call printWordFromStackRM
 		call printSpaceRM
 
 		; bMaxPacketSize
 		mov ah, 09h				
-		lea dx, bMaxPacketSizeMsg
+		lea dx, DDbMaxPacketSizeMsg
 		int 21h 
 		xor bx, bx
-		mov bl, [bMaxPacketSize]
+		mov bl, [DDbMaxPacketSize]
 		push bx 
 		call printWordFromStackRM
 		call printNewLineRM
 
 		; bDeviceSubclass
 		mov ah, 09h				
-		lea dx, bDeviceSubclassMsg
+		lea dx, DDbDeviceSubclassMsg
 		int 21h 
 		xor bx, bx 
-		mov bl, [bDeviceSubclass]
+		mov bl, [DDbDeviceSubclass]
 		push bx 
 		call printWordFromStackRM
 		call printSpaceRM
 
 		; bDeviceProtocol
 		mov ah, 09h				
-		lea dx, bDeviceProtocolMsg
+		lea dx, DDbDeviceProtocolMsg
 		int 21h 
 		xor bx, bx
-		mov bl, [bDeviceProtocol]
+		mov bl, [DDbDeviceProtocol]
 		push bx 
 		call printWordFromStackRM
 		call printNewLineRM
@@ -219,6 +318,72 @@ bMaxPacketSizeMsg		db "Max Packet Size     = $"
 
 		ret 
 
-	endp 
+	endp
+
+	; Fills fields of Hub Descriptor in mem 
+	; 
+	; ESI - Linear Address of Buffer where Hub Descriptor is stored
+	retrieveHubDescriptor proc near 
+
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		xor eax, eax 			;
+		lea eax, HDbLength		; 
+
+		mov bx, word ptr fs:[esi]
+		mov [eax], bx 			  
+		mov bl, byte ptr fs:[esi + 2]
+		mov [eax + 2], bl
+		mov bx, word ptr fs:[esi + 3]
+		mov [eax + 3], bx
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp
+
+	; Prints Hub Descriptor fields 
+	;
+	printHubDescriptor proc near
+		
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+
+		; bDescriptorType
+		mov ah, 09h				
+		lea dx, HDbDescriptorTypeMsg
+		int 21h 
+		xor bx, bx 
+		mov bl, [HDbDescriptorType]
+		push bx 
+		call printWordFromStackRM
+		call printSpaceRM
+
+		; HDbNbrPortsMsg
+		mov ah, 09h				
+		lea dx, HDbNbrPortsMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [HDbNbrPorts]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+		
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp  
 
 endm

@@ -86,6 +86,15 @@ SetDeviceAddrReq  		db 0,5
 GetConfigReq 			db 80h, 08h 
              			dw 0h, 0h, 1h 
 
+; Get Hub Descriptor Request
+; 
+GetHubDescReq 			db 10100000b, 06h 
+						dw 2900h, 0h, 5h
+
+; Get Port Status Request
+; 
+
+
 ; =====================================================================================================   
 ; Tokens for qTDs 
 
@@ -297,12 +306,15 @@ WriteBuffer db 4096 DUP(0)
 
 		; Endpoint characteristics (0x04)
 		add eax, 4                      ;
-		mov ebx, [QHEndpointParam]		;
+		mov ebx, dword ptr [QHEndpointParam]		
+		xor edx, edx 					; 
+		mov dl, [ValidDeviceAddress]	;
+		add bl, dl 						; Add Device Address 
 		mov [eax], ebx    		        ; (0x400 - max packet size [26:16])
 
 		; Transaction information (0x08)
 		add eax, 4 
-		mov ebx, 40000000h              ; Check! 
+		mov ebx, 40000000h              ; 
 		mov [eax], ebx 		            ; One transaction per microframe
 
 		; Current qTD (0x0C)
@@ -348,7 +360,8 @@ WriteBuffer db 4096 DUP(0)
 		push edx						; Save Register
 		push ebx 						; 
 		push cx							;
-		
+		;-------------------------------;
+
 		mov ebx, HCBaseAddress          ;
 
 		xor edx, edx                    
@@ -367,7 +380,8 @@ WriteBuffer db 4096 DUP(0)
 		mov eax, fs:[ebx]				; Get USBSTS value 
 		test eax, 00001000h             ; Checking 12-th bit 
 		jnz waitHCHaltedBit             ; Wait Until HCHalted is Set   
-
+		
+		;-------------------------------;
 		pop cx 							;
 		pop ebx 						; Recover Register 
 		pop edx 						; 
@@ -384,6 +398,7 @@ WriteBuffer db 4096 DUP(0)
 
 		push edx						; Save Register
 		push ebx 						; 
+		;-------------------------------;
 
 		xor edx, edx                    
 
@@ -393,7 +408,7 @@ WriteBuffer db 4096 DUP(0)
 		mov edx, fs:[ebx]               ; Gets USBCMD Register 
 		and edx, 0fffffffeh             ; Clears Run/Stop bit 
 		mov fs:[ebx], edx               ; Set updated value 
-										; Recover Register 
+		;-------------------------------; Recover Register 
 		pop ebx 						;
 		pop edx 						; 
 

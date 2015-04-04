@@ -21,12 +21,19 @@ AlignedFrameAddress dw 0h
 USBLEGSUPoffset 	 = 00h 
 USBLEGCTLSTSoffset   = 04h 
 
+; =====================================================================================================
+; Debug Strings 
+
 USBLEGSUPmsg 	 db "USBLEGSUP  Register = $"
 USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
 
 sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
 sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
 sHCInitDone 	 db "HC Init Done", 13, 10, "$"
+
+sDeviceDescriptorMsg  db 13, 10, "Get Device Descriptor ", 13, 10, "$"
+sDeviceEnumerationMsg db 13, 10, "Device Enumeration    ", 13, 10, "$"
+sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 
 ; =====================================================================================================
 
@@ -54,16 +61,21 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call Wait05s
 		call updatePORTstateReset
 
+		; Zero Transfer Structures Parameters 
+		call initTransferStrucutresParametes
 		; GET_DESCRIPTOR (Device)
 		call getDeviceDescTransaction
 		; Update Max Packet Size 
 		call updateEndpointParamInQH
 		; Set Device Address
 		call setDeviceAddrTransaction
-		;Enumerate Devices 
+		
+		cmp [DDbDeviceClass], 09h
+		jnz outProcessEHCIHC
+		; GET_DESCRIPTOR (hub)
+		call getHubDescTransaction
 
 		;call printQTDStatus
-		
 		;DUMP 
 		;call printTDArrayDump
 		;call printOutBufferDump
@@ -98,7 +110,10 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		;call testPortFunctions
 		;call Wait05s 
 		;call updatePORTstateReset
-  		
+  	  
+  	  
+  	  outProcessEHCIHC:
+
   		;------------------------;
   		pop esi 				 ;
 		pop edi                  ; 
@@ -515,8 +530,13 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	getDeviceDescTransaction proc near 
 		
 		push esi 				 ;
-		push eax 				 ; 
+		push eax 				 ;
+		push dx 				 ;  
 		;------------------------;
+
+		mov ah, 09h 			 
+		lea dx, sDeviceDescriptorMsg
+		int 21h 
 
 		; Setup Transaction
 		call createQueueHead
@@ -543,6 +563,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call printDeviceDescriptor
 
 		;------------------------;
+		pop dx 					 ; 
 		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
@@ -557,8 +578,13 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		
 		push esi 				 ; 
 		push eax 				 ;
+		push dx 				 ;
 		;------------------------;
 		
+		mov ah, 09h 			 
+		lea dx, sDeviceEnumerationMsg
+		int 21h 
+
 		; Increments Device Address
 		inc [SetDeviceAddrReq + 2]
 		call createQueueHead
@@ -567,7 +593,7 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call runAQueueinCMD
 		call Wait05s
 		call stopAQueueinCMD
-		call printQTDStatus
+		call printQTDStatus 
 
 		; Get Zero IN Packet
 		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
@@ -577,9 +603,61 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 		call runAQueueinCMD
 		call Wait05s 
 		call stopAQueueinCMD
-		call printQTDStatus 
+		call printQTDStatus
+
+		xor ax, ax 
+		mov ax, word ptr [SetDeviceAddrReq + 2] ; Remember updated Device Address
+		mov [ValidDeviceAddress], al  			; Saves Valid Device Address  
 		
 		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+
+	; Performs GET_DESCRIPTOR (HUB) transaction 
+	; Prints main fields 
+	;
+	getHubDescTransaction proc near 
+		
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		;------------------------;
+
+		mov ah, 09h 			 
+		lea dx, sHubDescriptorMsg
+		int 21h 
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetHubDescReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Prints Result 
+		mov esi, [LinearWriteBufferAddress]
+		call retrieveHubDescriptor
+		call printHubDescriptor
+		
+		;------------------------;
+		pop dx 					 ; 
 		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
@@ -607,6 +685,26 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 	
 		;------------------------;
 		pop eax                  ; 
+		pop ebx            		 ; 
+
+		ret 
+
+	endp
+
+	; Init field which are used in QH and qTDs with default values
+	; 
+	initTransferStrucutresParametes proc near
+
+		push ebx           		 ; Save Registers  
+		;------------------------; 
+
+		xor ebx, ebx 			 ; 
+
+		mov [ValidDeviceAddress], bl 
+		mov [ValidEndpoint], bl 
+		mov [InBytes], bx 
+
+		;------------------------;
 		pop ebx            		 ; 
 
 		ret 
