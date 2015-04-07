@@ -31,9 +31,14 @@ sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
 sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
 sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 
-sDeviceDescriptorMsg  db 13, 10, "Get Device Descriptor ", 13, 10, "$"
-sDeviceEnumerationMsg db 13, 10, "Device Enumeration    ", 13, 10, "$"
-sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
+sDeviceDescriptorMsg  db 13, 10, "Get Device Descriptor   ", 13, 10, "$"
+sDeviceEnumerationMsg db 13, 10, "Device Enumeration      ", 13, 10, "$"
+sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor      ", 13, 10, "$"
+sHubStatusMsg 	  	  db 13, 10, "Get Hub Status          ", 13, 10, "$"
+sDeviceConfigMsg 	  db 13, 10, "Get Device Configuration", 13, 10, "$"
+sSetDeviceConfigMsg	  db 13, 10, "Set Device Configuration", 13, 10, "$"
+sConfigDescMsg 	  	  db 13, 10, "Get Device Config Descriptor", 13, 10, "$"
+sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 
 ; =====================================================================================================
 
@@ -61,21 +66,37 @@ sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 		call Wait05s
 		call updatePORTstateReset
 
-		; Zero Transfer Structures Parameters 
-		call initTransferStrucutresParametes
+        ; Zero Transfer Structures Parameters 
+		call initTransferStrucutresParametes 
+		
 		; GET_DESCRIPTOR (Device)
 		call getDeviceDescTransaction
 		; Update Max Packet Size 
 		call updateEndpointParamInQH
 		; Set Device Address
 		call setDeviceAddrTransaction
-		
+		; Get Configuration Descriptor 
+		call getConfigDescTransaction
+		; Set Device Configuration
+		call setDeviceConfigTransaction
+		; Get Device Configuration
+		;call getDeviceConfigTransaction
+
 		cmp [DDbDeviceClass], 09h
 		jnz outProcessEHCIHC
-		; GET_DESCRIPTOR (hub)
+		
+		;GET_DESCRIPTOR (hub)
 		call getHubDescTransaction
 
-		;call printQTDStatus
+		;GET_STATUS (hub)  
+		call getHubStatusTransaction
+
+		; GET_PORT_STATUS (for all ports in hub)
+		call getPortStatusTransaction
+		
+		;GET_STATUS (device)  
+		;call getDeviceStatusTransaction
+		
 		;DUMP 
 		;call printTDArrayDump
 		;call printOutBufferDump
@@ -593,7 +614,7 @@ sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 		call runAQueueinCMD
 		call Wait05s
 		call stopAQueueinCMD
-		call printQTDStatus 
+		call printQTDStatus
 
 		; Get Zero IN Packet
 		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
@@ -608,7 +629,143 @@ sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 		xor ax, ax 
 		mov ax, word ptr [SetDeviceAddrReq + 2] ; Remember updated Device Address
 		mov [ValidDeviceAddress], al  			; Saves Valid Device Address  
+				
+		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+
+	; Performs SET_CONFIGURATION (Device) transaction 
+	; 
+	;
+	setDeviceConfigTransaction proc near 
 		
+		push esi 				 ; 
+		push eax 				 ;
+		push dx 				 ;
+		;------------------------;
+		
+		mov ah, 09h 			 
+		lea dx, sSetDeviceConfigMsg
+		int 21h 
+
+		call createQueueHead
+		xor dx, dx 
+		mov dl, [CDbConfigValue] ; Gets Configuration Value fron Configuration Descriptor 
+		lea esi, SetConfigReq
+		mov [esi + 2], dx        ; wValue lower byte is bConfiguration
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Get Zero IN Packet
+		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
+		mov [InBytes], ax             ; 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+
+	; Performs GET_CONFIGURATION (Device) transaction 
+	; Prints main fields 
+	;
+	getDeviceConfigTransaction proc near 
+		
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		;------------------------;
+
+		mov ah, 09h 			 
+		lea dx, sDeviceConfigMsg
+		int 21h 
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetConfigReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Prints Result 
+		mov esi, [LinearWriteBufferAddress]
+
+		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+
+	; Performs GET_CONFIGURATION_DESCRIPTOR transaction 
+	; Prints main fields 
+	;
+	getConfigDescTransaction proc near 
+		
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		;------------------------;
+
+		mov ah, 09h 			 
+		lea dx, sConfigDescMsg	
+		int 21h 
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetConfigDescReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Prints Result 
+		mov esi, [LinearWriteBufferAddress]
+		call retrieveConfigDescriptor
+		call printConfigDescriptor
+
 		;------------------------;
 		pop dx 					 ; 
 		pop eax 				 ; 
@@ -665,6 +822,121 @@ sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 	
 	endp
 	
+	; Performs GET_PORT_STATUS transaction 
+	; Prints main fields 
+	;
+	getPortStatusTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		push cx 				 ; 
+		;------------------------; 
+
+		xor cx, cx               ;
+		mov cl, byte ptr [HDbNbrPorts]
+
+		mov word ptr [GetPortStatusReq + 4], 0h 
+
+	  ;loopOverPortonHub:
+       
+        mov ah, 09h
+        lea dx, sPortStatusMsg
+        int 21h
+
+        ; Update Port
+        mov dx, word ptr [SetPortFeatureReq + 4]
+        inc dx 
+        mov word ptr [SetPortFeatureReq + 4], dx 
+
+        ; Set Feature 
+        mov dx, featurePORT_ENABLE
+        mov word ptr [SetPortFeatureReq + 2], dx 
+        
+        ; Setup Transaction
+		call createQueueHead
+		lea esi, SetPortFeatureReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus 
+
+		;-----------------------------;
+		
+		; Set Feature 
+        mov dx, featurePORT_POWER
+        mov word ptr [SetPortFeatureReq + 2], dx 
+
+        ; Setup Transaction
+		call createQueueHead
+		lea esi, SetPortFeatureReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus 
+
+		;-----------------------------;
+		; Get Status 
+
+		mov dx, word ptr [GetPortStatusReq + 4]
+        inc dx 
+        mov word ptr [GetPortStatusReq + 4], dx 
+        
+        ; Setup Transaction
+		call createQueueHead
+		lea esi, GetPortStatusReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus 
+
+	  	call printOutBufferDump
+
+	  	;loop loopOverPortonHub
+
+		;------------------------;
+		pop cx 					 ; 
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret
+
+	endp 
+	
 	; Updates Endpoint Characteristics (Max Packet Size) 
 	;
 	updateEndpointParamInQH proc near
@@ -688,6 +960,97 @@ sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor    ", 13, 10, "$"
 		pop ebx            		 ; 
 
 		ret 
+
+	endp
+
+	; Performs GET_HUB_STATUS transaction 
+	; Prints main fields 
+	; 
+	getHubStatusTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		;------------------------;
+
+		mov ah, 09h 			 
+		lea dx, sHubStatusMsg
+		int 21h 
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetHubStatusReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret
+
+	endp
+
+	; Performs GET_HUB_STATUS transaction 
+	; Prints main fields 
+	; 
+	getDeviceStatusTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		;------------------------;
+
+		;mov ah, 09h 			 
+		;lea dx, sHubDescriptorMsg
+		;int 21h 
+
+		; Setup Transaction
+		call createQueueHead
+		lea esi, GetDeviceStatusReq
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; In Transaction
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		; Prints Result 
+		;mov esi, [LinearWriteBufferAddress]
+		;call retrieveHubDescriptor
+		;call printHubDescriptor
+
+		call printOutBufferDump
+
+		;------------------------;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret
 
 	endp
 
