@@ -39,6 +39,8 @@ sDeviceConfigMsg 	  db 13, 10, "Get Device Configuration", 13, 10, "$"
 sSetDeviceConfigMsg	  db 13, 10, "Set Device Configuration", 13, 10, "$"
 sConfigDescMsg 	  	  db 13, 10, "Get Device Config Descriptor", 13, 10, "$"
 sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
+sPortPowerOnMsg 	  db 13, 10, "Ports Power is On    	  ", 13, 10, "$"
+sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 
 ; =====================================================================================================
 
@@ -68,7 +70,6 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 
         ; Zero Transfer Structures Parameters 
 		call initTransferStrucutresParametes 
-		
 		; GET_DESCRIPTOR (Device)
 		call getDeviceDescTransaction
 		; Update Max Packet Size 
@@ -79,6 +80,7 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 		call getConfigDescTransaction
 		; Set Device Configuration
 		call setDeviceConfigTransaction
+		
 		; Get Device Configuration
 		;call getDeviceConfigTransaction
 
@@ -87,12 +89,13 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 		
 		;GET_DESCRIPTOR (hub)
 		call getHubDescTransaction
-
 		;GET_STATUS (hub)  
 		call getHubStatusTransaction
-
-		; GET_PORT_STATUS (for all ports in hub)
-		call getPortStatusTransaction
+		; SET_FEATURE (PORT_POWER) for HUB 
+		call setPowerHubPortsTransaction
+		; Enables Hub Ports 
+		call enableHubPortsTransaction
+		
 		
 		;GET_STATUS (device)  
 		;call getDeviceStatusTransaction
@@ -829,81 +832,10 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 
 		push esi 				 ;
 		push eax 				 ;
-		push dx 				 ; 
-		push cx 				 ; 
 		;------------------------; 
 
-		xor cx, cx               ;
-		mov cl, byte ptr [HDbNbrPorts]
-
-		mov word ptr [GetPortStatusReq + 4], 0h 
-
-	  ;loopOverPortonHub:
-       
-        mov ah, 09h
-        lea dx, sPortStatusMsg
-        int 21h
-
-        ; Update Port
-        mov dx, word ptr [SetPortFeatureReq + 4]
-        inc dx 
-        mov word ptr [SetPortFeatureReq + 4], dx 
-
-        ; Set Feature 
-        mov dx, featurePORT_ENABLE
-        mov word ptr [SetPortFeatureReq + 2], dx 
-        
-        ; Setup Transaction
-		call createQueueHead
-		lea esi, SetPortFeatureReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
-
-		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus 
-
-		;-----------------------------;
-		
-		; Set Feature 
-        mov dx, featurePORT_POWER
-        mov word ptr [SetPortFeatureReq + 2], dx 
-
-        ; Setup Transaction
-		call createQueueHead
-		lea esi, SetPortFeatureReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
-
-		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus 
-
-		;-----------------------------;
 		; Get Status 
 
-		mov dx, word ptr [GetPortStatusReq + 4]
-        inc dx 
-        mov word ptr [GetPortStatusReq + 4], dx 
-        
         ; Setup Transaction
 		call createQueueHead
 		lea esi, GetPortStatusReq
@@ -911,7 +843,6 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 		call runAQueueinCMD
 		call Wait05s
 		call stopAQueueinCMD
-		call printQTDStatus
 
 		; In Transaction
 		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
@@ -921,11 +852,55 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 		call runAQueueinCMD
 		call Wait05s 
 		call stopAQueueinCMD
-		call printQTDStatus 
+		
+		;------------------------;
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
 
-	  	call printOutBufferDump
+		ret
 
-	  	;loop loopOverPortonHub
+	endp
+
+	; Performs SET_PORT_FEATURE transaction with PORT_POWER parameter 
+	; Prints main fields 
+	;
+	setPowerHubPortsTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		push cx 				 ; 
+		;------------------------; 
+
+		xor cx, cx               ;
+		mov cl, byte ptr [HDbNbrPorts]
+
+		; Setting Default Port 
+		mov word ptr [SetPortFeatureReq + 4], 0h
+
+		mov ah, 09h
+        lea dx, sPortPowerOnMsg
+        int 21h 
+
+	  setPowerOverPortOnHub:
+
+        ; Update Port number
+        mov dx, word ptr [SetPortFeatureReq + 4]
+        inc dx 
+        mov word ptr [SetPortFeatureReq + 4], dx 
+
+		; Set Feature 
+        mov dx, featurePORT_POWER
+        mov word ptr [SetPortFeatureReq + 2], dx 
+
+        ; Setup Transaction
+		lea esi, SetPortFeatureReq
+		call performAQSetupTransaction		
+		
+		; In Transaction
+		call performAQInTransaction
+
+	  	loop setPowerOverPortOnHub
 
 		;------------------------;
 		pop cx 					 ; 
@@ -935,7 +910,113 @@ sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 
 		ret
 
-	endp 
+	endp
+
+	; Performs port enabling: 
+	; 
+	; Clears C_PORT_CONNECTION feature 
+	; Sets PORT_RESET feature 
+	; Clears C_PORT_RESET feature
+	; 
+	enableHubPortsTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ; 
+		push cx 				 ; 
+		;------------------------; 
+
+		xor cx, cx               ;
+		mov cl, byte ptr [HDbNbrPorts]
+		
+		; Setting Default Port 
+		mov word ptr [SetPortFeatureReq + 4], 0h
+		; Setting Default Port 
+		mov word ptr [GetPortStatusReq + 4], 0h
+		; Setting Default Port 
+		mov word ptr [ClearPortFeatureReq + 4], 0h
+
+		mov ah, 09h
+        lea dx, sPortEnableMsg
+        int 21h 
+
+	  enableHubPortsOnHub:
+
+	    ; Update Port number
+        mov dx, word ptr [GetPortStatusReq + 4]
+        inc dx 
+        mov word ptr [GetPortStatusReq + 4], dx
+
+        ; Gets Port Status 
+        call getPortStatusTransaction
+        mov edx, dword ptr [LinearWriteBufferAddress]
+        
+        ; Gets PORT_STATUS Value 
+        mov eax, dword ptr fs:[edx]
+        
+        ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
+        test eax, 00010000h
+        jz enableNextHubPort
+
+        ; Update Port number
+        mov dx, word ptr [GetPortStatusReq + 4]
+        mov word ptr [SetPortFeatureReq + 4], dx
+        mov word ptr [ClearPortFeatureReq + 4], dx  
+
+        ;------------------------------------------;
+		; CLEAR_FEATURE (C_PORT_CONNECTION)
+        
+        mov dx, featureC_PORT_CONNECT
+        mov word ptr [ClearPortFeatureReq + 2], dx 
+
+        ; Setup Transaction
+		lea esi, ClearPortFeatureReq
+		call performAQSetupTransaction
+
+		; In Transaction
+		call performAQInTransaction
+
+        ;------------------------------------------;
+        ; SET_FEATURE (PORT_RESET)
+        
+        mov dx, featurePORT_RESET
+        mov word ptr [SetPortFeatureReq + 2], dx 
+
+        ; Setup Transaction
+		lea esi, SetPortFeatureReq
+		call performAQSetupTransaction
+
+		; In Transaction
+		call performAQInTransaction
+
+		;------------------------------------------;
+        ; CLEAR_FEATURE (С_PORT_RESET)
+        
+        mov dx, featureC_PORT_RESET
+        mov word ptr [ClearPortFeatureReq + 2], dx 
+
+        ; Setup Transaction
+		lea esi, ClearPortFeatureReq
+		call performAQSetupTransaction
+
+		; In Transaction
+		call performAQInTransaction
+
+		;------------------------------------------;
+
+	  enableNextHubPort:
+ 
+	  	loop enableHubPortsOnHub
+
+		;------------------------;
+		pop cx 					 ; 
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret
+
+	endp  
 	
 	; Updates Endpoint Characteristics (Max Packet Size) 
 	;

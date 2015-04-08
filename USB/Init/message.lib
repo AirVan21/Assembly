@@ -2,7 +2,7 @@ messageLib macro
 
 ; =====================================================================================================
 
-qTDOffset   = 20h 
+qTDOffset   	  = 20h 
 PeriodicFramInMem = 01000000h 
 
 ; =====================================================================================================
@@ -69,7 +69,12 @@ GetDeviceDescReq8 		db 80h, 6h
 ; Get 18-byte Device Descriptor 
 ;
 GetDeviceDescReq18 		db 80h, 6h
-             	   		dw 100h, 0h, 12h 
+             	   		dw 100h, 0h, 12h
+
+; Get 9-byte Configuration Descriptor 
+;
+GetConfigDescReq 		db 80h, 6h
+             	   		dw 200h, 0h, 9h  
 
 ; Get String Descriptor (English Language)
 ;
@@ -84,16 +89,47 @@ SetDeviceAddrReq  		db 0,5
 ; Get Configuration Request
 ;
 GetConfigReq 			db 80h, 08h 
-             			dw 0h, 0h, 1h 
+             			dw 0h, 0h, 1h
+
+; Set Configuration Request
+; Configuration value shpuld be written in wValue lower byte 
+;
+SetConfigReq 			db 00h, 09h 
+             			dw 0h, 0h, 0h  
 
 ; Get Hub Descriptor Request
 ; 
 GetHubDescReq 			db 10100000b, 06h 
-						dw 2900h, 0h, 5h
+						dw 2900h, 0h, 9h
 
 ; Get Port Status Request
 ; 
+GetPortStatusReq		db 0A3h, 00h 
+						dw 0h, 0h, 4h
 
+; Get Hub Status Request
+; 
+GetHubStatusReq			db 0A0h, 00h 
+						dw 0h, 0h, 4h
+
+; Set Port Feature 
+; 
+SetPortFeatureReq		db 023h, 03h 
+						dw 0h, 0h, 0h
+
+; Clear Port Feature 
+; 
+ClearPortFeatureReq		db 023h, 01h 
+						dw 0h, 0h, 0h ; wValue = Feature Selector | wIndex = Port Number  
+
+; ===================================================================================================== 
+; Port Feature
+
+featurePORT_ENABLE		= 1
+featurePORT_RESET 		= 4
+featurePORT_POWER 		= 8 
+featureC_PORT_CONNECT   = 16
+featureC_PORT_RESET     = 20  
 
 ; =====================================================================================================   
 ; Tokens for qTDs 
@@ -153,6 +189,46 @@ WriteBuffer db 4096 DUP(0)
 		db 0C3h                			; ret  
 
 	endp
+
+	; Creates MAIN Control Structures for SETUP Token Transaction
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; Waits timer 
+	; Sets USBCMD (Asynch Queue) bit to ZERO 
+	; 
+	; ESI - contains pointer to perfrrmed transaction
+	performAQSetupTransaction proc
+		
+		call createQueueHead
+		call createSetupQTD
+		call runAQueueinCMD
+		call Wait05s
+		call stopAQueueinCMD
+		call printQTDStatus 
+
+		ret 
+	
+	endp
+
+	; Creates MAIN Control Structures 
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; Waits timer 
+	; Sets USBCMD (Asynch Queue) bit to ZERO 
+	; 
+	; ESI - contains pointer to perfrrmed transaction
+	performAQInTransaction proc
+		
+		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
+		mov [InBytes], ax 			  ; Update IN Bytes field 
+		call createQueueHead
+		call createInQTD
+		call runAQueueinCMD
+		call Wait05s 
+		call stopAQueueinCMD
+		call printQTDStatus 
+
+		ret 
+	
+	endp  
 
 	; Creates Setup qTD with Payload (described in ESI)
 	;
@@ -415,47 +491,6 @@ WriteBuffer db 4096 DUP(0)
 		ret 
 	
 	endp 
-
-	; Sets USBCMD (Asynch Queue) bit to ONE 
-	; Wait Until Asyhch Queue is valid (transaction end)
-	; 
-	;
-	performAQTransaction proc
-
-		push edx						; Save Register
-		push ebx 						; 
-
-		mov ebx, HCBaseAddress 		    ; Gets Base Address
-
-		xor edx, edx                    
-
-		mov dx, OperRegOff				; Offset for Operational Register
-		add ebx, edx                    ; USBCMD Base Address 
-
-		mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		or edx, 20h   			        ; Sets Asynch Queue bit 
-		mov fs:[ebx], edx               ; Set updated value
-
-		add ebx, USBSTSoffset			; Points to USBSTS Register 
-
-	  waitWhileAQisActive:				; Wait till transaction end 
-
-	  	mov edx, fs:[ebx] 				; USBSTS 
-	  	test edx, 00002000h				; Checking Reclamation bit 
-	  	jz waitWhileAQisActive			;
-
-	  	sub ebx, USBSTSoffset			;
-	  	mov edx, fs:[ebx]               ; Gets USBCMD Register 
-		and edx, 0ffffffdfh             ; Clears Asynch Queue bit && Reclamation bit 
-		mov fs:[ebx], edx               ; Set updated value 
-
-										; Recover Register 
-		pop ebx 						;
-		pop edx 						; 
-
-		ret 
-	
-	endp 	
 
 	; Sets in AsуnchLBRegister Address of Already Created Queue Structure
 	; 
