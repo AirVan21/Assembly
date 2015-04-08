@@ -527,7 +527,6 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 		push esi 				 ;
 		push eax 				 ;
-		push cx                  ;
 		;------------------------;
         
         ; Zero Transfer Structures Parameters 
@@ -554,23 +553,10 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		call setPowerHubPortsTransaction
 		; Enables Hub Ports 
 		call enableHubPortsTransaction
-
-		mov cx, [ConncetedUSBDeviceAmount]
-		cmp cx, 0h 
-		jz OutProcessUSBDevice
-
-      ; Recursive Detour 
-	  processUSBDeviceInHub:
-
-        call processUSBDevice
-
-        loop processUSBDeviceInHub
-
 	  
-	  OutProcessUSBDevice:	
-	
+	  OutProcessUSBDevice:
+
 		;------------------------;
-		pop cx                   ;
 		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
@@ -662,16 +648,12 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		lea dx, sSetDeviceConfigMsg
 		int 21h 
 
-		call createQueueHead
+		; Setup token 
 		xor dx, dx 
-		mov dl, [CDbConfigValue] ; Gets Configuration Value fron Configuration Descriptor 
+		mov dl, [CDbConfigValue] ; Gets Configuration Value from Configuration Descriptor 
 		lea esi, SetConfigReq
 		mov [esi + 2], dx        ; wValue lower byte is bConfiguration
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; Get Zero IN Packet
 		call performAQInTransaction
@@ -765,13 +747,8 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		int 21h 
 
 		; Setup Transaction
-		call createQueueHead
 		lea esi, GetHubDescReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; In Transaction
 		call performAQInTransaction
@@ -888,6 +865,8 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		mov word ptr [GetPortStatusReq + 4], 0h
 		; Setting Default Port 
 		mov word ptr [ClearPortFeatureReq + 4], 0h
+		; Connected Device Amount 
+		mov word ptr [ConncetedUSBDeviceAmount], 0h 
 
 		mov ah, 09h
         lea dx, sPortEnableMsg
@@ -899,6 +878,10 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
         mov dx, word ptr [GetPortStatusReq + 4]
         inc dx 
         mov word ptr [GetPortStatusReq + 4], dx
+
+        ; Port Number 
+        ;push dx 
+        ;call printWordFromStackRM
 
         ; Gets Port Status 
         call getPortStatusTransaction
@@ -953,9 +936,18 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		; In Transaction
 		call performAQInTransaction
 
-		;------------------------------------------;
+		; Saves Valid Hub Address
+		mov dl, [ValidDeviceAddress]
+		
+		; Handle Connected USB Device 
+		call processUSBDevice
+
+		; Recover Valid Hub Address
+		mov [ValidDeviceAddress], dl 
 
 		inc [ConncetedUSBDeviceAmount]
+		
+		;------------------------------------------;
 
 	  enableNextHubPort:
  
@@ -1100,7 +1092,6 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		mov [ValidDeviceAddress], bl 
 		mov [ValidEndpoint], bl 
 		mov [InBytes], bx
-		mov [ConncetedUSBDeviceAmount], bx  
 
 		;------------------------;
 		pop ebx            		 ; 
