@@ -11,6 +11,8 @@ HCBaseAddress 		dd 0h
 USBLEGSUPReg		dd 0h
 USBLEGCTLSTSReg 	dd 0h
 
+ConncetedUSBDeviceAmount	dw 0h 
+
 ; Paragraph style 
 FrameAddress 		dw 0h
 AlignedFrameAddress dw 0h  
@@ -41,6 +43,7 @@ sConfigDescMsg 	  	  db 13, 10, "Get Device Config Descriptor", 13, 10, "$"
 sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
 sPortPowerOnMsg 	  db 13, 10, "Ports Power is On    	  ", 13, 10, "$"
 sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
+sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 ; =====================================================================================================
 
@@ -53,8 +56,6 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		; Include code for Operational Registers Displacement CalCulation 
 		
 		push ebx           		 	; Save 
-		push eax           		 	; 
-		push edi                 	;
 		push esi				 	;
 		;---------------------------;
 				
@@ -68,34 +69,9 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		call Wait05s
 		call updatePORTstateReset
 
-        ; Zero Transfer Structures Parameters 
-		call initTransferStrucutresParametes 
-		; GET_DESCRIPTOR (Device)
-		call getDeviceDescTransaction
-		; Update Max Packet Size 
-		call updateEndpointParamInQH
-		; Set Device Address
-		call setDeviceAddrTransaction
-		; Get Configuration Descriptor 
-		call getConfigDescTransaction
-		; Set Device Configuration
-		call setDeviceConfigTransaction
-		
-		; Get Device Configuration
-		;call getDeviceConfigTransaction
+		call processUSBDevice
 
-		cmp [DDbDeviceClass], 09h
-		jnz outProcessEHCIHC
-		
-		;GET_DESCRIPTOR (hub)
-		call getHubDescTransaction
-		;GET_STATUS (hub)  
-		call getHubStatusTransaction
-		; SET_FEATURE (PORT_POWER) for HUB 
-		call setPowerHubPortsTransaction
-		; Enables Hub Ports 
-		call enableHubPortsTransaction
-		
+		;-------------------------------------; 
 		
 		;GET_STATUS (device)  
 		;call getDeviceStatusTransaction
@@ -135,13 +111,9 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		;call Wait05s 
 		;call updatePORTstateReset
   	  
-  	  
-  	  outProcessEHCIHC:
 
   		;------------------------;
   		pop esi 				 ;
-		pop edi                  ; 
-		pop eax                  ; 
 		pop ebx            		 ; Recover  
 
 
@@ -548,6 +520,64 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 	
 	endp
 
+	; MAIN procedure for Device Initialization, Enumeration, Configuration
+	; Processes USB Hubs 
+	;
+	processUSBDevice proc near 
+
+		push esi 				 ;
+		push eax 				 ;
+		push cx                  ;
+		;------------------------;
+        
+        ; Zero Transfer Structures Parameters 
+		call initTransferStrucutresParametes 
+		; GET_DESCRIPTOR (Device)
+		call getDeviceDescTransaction
+		; Update Max Packet Size 
+		call updateEndpointParamInQH
+		; Set Device Address
+		call setDeviceAddrTransaction
+		; Get Configuration Descriptor 
+		call getConfigDescTransaction
+		; Set Device Configuration
+		call setDeviceConfigTransaction
+
+		cmp [DDbDeviceClass], 09h
+		jnz OutProcessUSBDevice
+		
+		;GET_DESCRIPTOR (hub)
+		call getHubDescTransaction
+		;GET_STATUS (hub)  
+		call getHubStatusTransaction
+		; SET_FEATURE (PORT_POWER) for HUB 
+		call setPowerHubPortsTransaction
+		; Enables Hub Ports 
+		call enableHubPortsTransaction
+
+		mov cx, [ConncetedUSBDeviceAmount]
+		cmp cx, 0h 
+		jz OutProcessUSBDevice
+
+      ; Recursive Detour 
+	  processUSBDeviceInHub:
+
+        call processUSBDevice
+
+        loop processUSBDeviceInHub
+
+	  
+	  OutProcessUSBDevice:	
+	
+		;------------------------;
+		pop cx                   ;
+		pop eax 				 ; 
+		pop esi            		 ; Recover 
+
+		ret 
+	
+	endp
+
 	; Performs GET_DESCRIPTOR (Device) transaction 
 	; Prints main fields 
 	;
@@ -563,23 +593,11 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		int 21h 
 
 		; Setup Transaction
-		call createQueueHead
 		lea esi, GetDeviceDescReq18
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
@@ -611,23 +629,11 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 
 		; Increments Device Address
 		inc [SetDeviceAddrReq + 2]
-		call createQueueHead
 		lea esi, SetDeviceAddrReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; Get Zero IN Packet
-		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
-		mov [InBytes], ax             ; 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		xor ax, ax 
 		mov ax, word ptr [SetDeviceAddrReq + 2] ; Remember updated Device Address
@@ -668,14 +674,7 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		call printQTDStatus
 
 		; Get Zero IN Packet
-		mov ax, [esi + wLengthOffset] ; Bytes to Transaction via Transaction
-		mov [InBytes], ax             ; 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		;------------------------;
 		pop dx 					 ; 
@@ -701,26 +700,11 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		int 21h 
 
 		; Setup Transaction
-		call createQueueHead
 		lea esi, GetConfigReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
-
-		; Prints Result 
-		mov esi, [LinearWriteBufferAddress]
+		call performAQInTransaction
 
 		;------------------------;
 		pop dx 					 ; 
@@ -746,23 +730,11 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		int 21h 
 
 		; Setup Transaction
-		call createQueueHead
 		lea esi, GetConfigDescReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
@@ -802,14 +774,7 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		call printQTDStatus
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
@@ -831,30 +796,17 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 	getPortStatusTransaction proc near
 
 		push esi 				 ;
-		push eax 				 ;
 		;------------------------; 
 
 		; Get Status 
-
         ; Setup Transaction
-		call createQueueHead
 		lea esi, GetPortStatusReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
+		call performAQSetupTransaction	
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
+		call performAQInTransaction
 		
 		;------------------------;
-		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
 		ret
@@ -924,6 +876,7 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		push eax 				 ;
 		push dx 				 ; 
 		push cx 				 ; 
+		push bx 				 ; 
 		;------------------------; 
 
 		xor cx, cx               ;
@@ -950,14 +903,12 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
         ; Gets Port Status 
         call getPortStatusTransaction
         mov edx, dword ptr [LinearWriteBufferAddress]
-        
-        ; Gets PORT_STATUS Value 
-        mov eax, dword ptr fs:[edx]
-        
+        mov eax, fs:[edx]
+       
         ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
         test eax, 00010000h
-        jz enableNextHubPort
-
+        jz enableNextHubPort	
+        
         ; Update Port number
         mov dx, word ptr [GetPortStatusReq + 4]
         mov word ptr [SetPortFeatureReq + 4], dx
@@ -1004,11 +955,25 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 
 		;------------------------------------------;
 
+		inc [ConncetedUSBDeviceAmount]
+
 	  enableNextHubPort:
  
 	  	loop enableHubPortsOnHub
 
+	  	;------------------------------------------;
+		; Log info 
+	  	
+	  	mov ah, 09h
+	  	lea dx, sConnectedDevNumMsg
+	  	int 21h 
+	  	mov ax, [ConncetedUSBDeviceAmount]
+		push ax 
+		call printWordFromStackRM
+		call printNewLineRM
+
 		;------------------------;
+		pop bx 					 ;
 		pop cx 					 ; 
 		pop dx 					 ; 
 		pop eax 				 ; 
@@ -1059,23 +1024,11 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 		int 21h 
 
 		; Setup Transaction
-		call createQueueHead
 		lea esi, GetHubStatusReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQSetupTransaction
 
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
+		call performAQInTransaction
 
 		;------------------------;
 		pop dx 					 ; 
@@ -1146,7 +1099,8 @@ sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
 
 		mov [ValidDeviceAddress], bl 
 		mov [ValidEndpoint], bl 
-		mov [InBytes], bx 
+		mov [InBytes], bx
+		mov [ConncetedUSBDeviceAmount], bx  
 
 		;------------------------;
 		pop ebx            		 ; 

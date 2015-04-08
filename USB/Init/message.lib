@@ -203,7 +203,7 @@ WriteBuffer db 4096 DUP(0)
 		call runAQueueinCMD
 		call Wait05s
 		call stopAQueueinCMD
-		call printQTDStatus 
+		;call printQTDStatus 
 
 		ret 
 	
@@ -224,7 +224,7 @@ WriteBuffer db 4096 DUP(0)
 		call runAQueueinCMD
 		call Wait05s 
 		call stopAQueueinCMD
-		call printQTDStatus 
+		;call printQTDStatus 
 
 		ret 
 	
