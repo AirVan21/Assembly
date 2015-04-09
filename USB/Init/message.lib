@@ -78,8 +78,13 @@ GetConfigDescReq 		db 80h, 6h
 
 ; Get String Descriptor (English Language)
 ;
-GetStrDescReq64 		db 80h, 6
-             			dw 300h, 0409h, 64
+GetStrDescReq 			db 80h, 6h
+             			dw 300h, 0h, 4
+
+; Get String Descriptor (English Language)
+;
+GetStrDescReq128 		db 80h, 6h
+             			dw 0302h, 0409h, 128
  
 ; Set Device Address Request (First Address is 1)  
 ;
@@ -217,6 +222,8 @@ WriteBuffer db 4096 DUP(0)
 	; ESI - contains pointer to perfrrmed transaction
 	performAQInTransaction proc
 		
+		push ax 
+		
 		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
 		mov [InBytes], ax 			  ; Update IN Bytes field 
 		call createQueueHead
@@ -225,6 +232,8 @@ WriteBuffer db 4096 DUP(0)
 		call Wait05s 
 		call stopAQueueinCMD
 		;call printQTDStatus 
+
+		pop ax 
 
 		ret 
 	

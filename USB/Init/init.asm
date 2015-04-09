@@ -24,11 +24,9 @@ _:
 	
 	mov cx, 10            		; Counter for bar Amount
 								; Address of Possible BAR 
+	
 	lea edx, HCBaseAddressStorage
 	lea esi, HCPCIAddressStorage
-
-;barLoop:
-
 	mov ebx, dword ptr [edx]	; Gets Base address
 	mov eax, dword ptr [esi]	; Gets PCI address 
 	mov HCPCIAddress, eax 		; Write PCI address 
@@ -38,9 +36,21 @@ _:
 	call processEHCIHC			; Main Function 
 	add edx, 4                  ; Mov to the next Base Address
 	add esi, 4					; MOv to the next PCI 
-	call printNewLineRM          
+	call printNewLineRM
 
-;	loop barLoop
+	lea edx, HCBaseAddressStorage
+	lea esi, HCPCIAddressStorage
+	mov ebx, dword ptr [edx+4]	; Gets Base address
+	mov eax, dword ptr [esi+4]	; Gets PCI address 
+	mov HCPCIAddress, eax 		; Write PCI address 
+	cmp ebx, 0                  ; If Valid Base Address
+	jz outOfBarLoop             ; Out in not Valid 
+	mov HCBaseAddress, ebx 	    ; Save Base Address 
+	call processEHCIHC			; Main Function 
+	add edx, 4                  ; Mov to the next Base Address
+	add esi, 4					; MOv to the next PCI 
+	call printNewLineRM                 
+
 
 outOfBarLoop:
 

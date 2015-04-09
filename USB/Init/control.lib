@@ -76,10 +76,35 @@ HDbNbrPorts				db 0h
 HDwHubCharact			dw 0h 
 
 ; =====================================================================================================
-; Hub Descriptor Strings
+; Hub Descriptor (HD) strings 
 
 HDbDescriptorTypeMsg		db "Descriptor (0x29)   = $"
-HDbNbrPortsMsg 				db "Amount of ports     = $"
+HDbNbrPortsMsg				db "Number of Ports     = $"
+
+; =====================================================================================================
+; Configuration Descriptor (CD) fields
+
+CDbLength				db 0h
+CDbDescriptorType		db 0h
+CDwTotalLength			dw 0h
+CDbNumInterfaces		db 0h
+CDbConfigValue 			db 0h
+CDiConfiguration 		db 0h 
+CDbAttributes			db 0h 
+CDbMaxPower				db 0h 
+
+; =====================================================================================================
+; Configuration Descriptor (CD) strings 
+
+CDbDescriptorTypeMsg		db "Descriptor (0x02)   = $"
+CDbConfigValueMsg			db "Configuration Value = $"
+CDiConfigurationMsg			db "iConfiguration      = $"
+
+; =====================================================================================================
+; Print Buffer 
+; 
+PrintBuffer db 64 DUP(0)
+			db 13,10,"$" 
 
 ; =====================================================================================================
 ; 09h | 00h | 00h => Class | Subclass | Protocol => Full speed Hub
@@ -385,5 +410,110 @@ HDbNbrPortsMsg 				db "Amount of ports     = $"
 		ret 
 
 	endp  
+	
+	; Fills fields of Configuration Descriptor in mem 
+	; 
+	; ESI - Linear Address of Buffer where Configuration Descriptor is stored
+	retrieveConfigDescriptor proc near 
+
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		xor eax, eax 			;
+		lea eax, CDbLength		; 
+
+		mov ebx, fs:[esi]		;
+		mov [eax], ebx 			; 
+		mov ebx, fs:[esi + 4]	;
+		mov [eax + 4], ebx 		; 
+		mov bl, fs:[esi + 8]	;
+		mov [eax + 8], bl 		;
+
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp
+
+	; Prints Configuration Descriptor fields 
+	;
+	printConfigDescriptor proc near
+		
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+
+		; bDescriptorType
+		mov ah, 09h				
+		lea dx, CDbDescriptorTypeMsg
+		int 21h 
+		xor bx, bx 
+		mov bl, [CDbDescriptorType]
+		push bx 
+		call printWordFromStackRM
+		call printSpaceRM
+
+		; CDbConfigValue
+		mov ah, 09h				
+		lea dx, CDbConfigValueMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [CDbConfigValue]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+		
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp 
+
+	; Prints String Descriptor
+	; 
+	; ESI - Linear Address of Buffer where String Descriptor is stored
+	printStringDescriptor proc near
+		
+		push ecx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		lea edx, PrintBuffer		
+		mov cx, 16  
+
+		;Prints Unicode Chars
+
+	  printStringDescriptorLoop:
+		
+		mov ax, word ptr fs:[esi]
+		mov [edx], ax 
+		add edx, 2
+		add esi, 2  
+
+		loop printStringDescriptorLoop 
+
+		mov ah, 09h				
+		lea dx, PrintBuffer
+		add dx, 2
+		int 21h 
+		
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ecx                 ;
+
+		ret 
+
+	endp   
 
 endm
