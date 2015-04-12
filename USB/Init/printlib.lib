@@ -19,6 +19,15 @@ PortValue:
 	dd 00h 
 
 ; =====================================================================================================
+; String CONSTS 
+
+usb_00    db ' UHCI (Universal Host Controller)$'
+usb_10    db ' OHCI (Open Host Controller)$'
+usb_20    db ' EHCI (Enhanced Host Controller)$'
+usb_30    db ' xHCI (Extensible Host Controller)$'
+
+; =====================================================================================================
+
 
 	; Prints string while (charToPrint != '$')
 	;
@@ -453,6 +462,50 @@ PortValue:
 
 		ret 
 
-	endp 
+	endp
+
+	; Prints information about USB class
+	;
+	; AX - containes USB HC class parameter
+	displayUSBtype proc near 
+
+		push ax                ;
+		push dx				   ; Save dx 
+
+		; AX - parameter
+		cmp ax, 0h             ;
+		jz  showusb00          ; UHCI
+		cmp ax, 10h            ;
+		jz  showusb10          ; OHCI
+		cmp ax, 20h            ;
+		jz  showusb20          ; EHCI
+		cmp ax, 30h            ;
+		jz  showusb30          ; xHCI
+
+	  showusb00:
+		lea dx, usb_00         ; Sets Appropriate String 
+		jmp outUSBtype         ; 
+
+	  showusb10:
+		lea dx, usb_10         ; Sets Appropriate String 
+		jmp outUSBtype         ;
+
+	  showusb20:
+		lea dx, usb_20         ; Sets Appropriate String 
+		jmp outUSBtype         ;
+
+	  showusb30:
+		lea dx, usb_30         ; Sets Appropriate String 
+
+	  outUSBtype:                ; Point to jump out of type definition
+		mov ah, 09h            ; Print string
+		int 21h                ;
+
+		pop dx                 ; Recover DX
+		pop ax                 ;
+
+		db 0C3h                ; ret
+
+	endp  
 
 endm
