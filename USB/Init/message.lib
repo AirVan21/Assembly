@@ -1,4 +1,4 @@
-messageLib macro
+initMessageLib macro
 
 ; =====================================================================================================
 
@@ -27,7 +27,20 @@ wLengthOffset 			  = 6
 
 ; QH Endpoint characteristics  
 ;
-QHEndpointParam			dd 5040E000h
+QHEndpointParam			dd 5008E000h
+
+; QH Endpoint Low Speed Param 
+;
+QHEndpointLowSpeed = 5808D000h 
+
+; QH Endpoint Full Speed Param 
+;
+QHEndpointFullSpeed = 5808C000h 
+
+; QH Endpoint High Speed Param 
+;
+QHEndpointHighSpeed = 5008E000h 
+
 
 ; =====================================================================================================
 
@@ -70,11 +83,20 @@ GetDeviceDescReq8 		db 80h, 6h
 ;
 GetDeviceDescReq18 		db 80h, 6h
              	   		dw 100h, 0h, 12h
+; Get Interface Descriptor 
+;
+GetInterfaceDescReq 	db 80h, 6h
+             	   		dw 400h, 0h, 9h ; 0x04 Descriptor type | 0x00
 
 ; Get 9-byte Configuration Descriptor 
 ;
 GetConfigDescReq 		db 80h, 6h
-             	   		dw 200h, 0h, 9h  
+             	   		dw 200h, 0h, 9h
+
+; Get 64-byte Configuration Descriptor 
+;
+GetConfigDescReq64 		db 80h, 6h
+             	   		dw 200h, 0h, 64    
 
 ; Get String Descriptor (English Language)
 ;
@@ -83,8 +105,8 @@ GetStrDescReq 			db 80h, 6h
 
 ; Get String Descriptor (English Language)
 ;
-GetStrDescReq128 		db 80h, 6h
-             			dw 0302h, 0409h, 128
+GetStrDescReq64 		db 80h, 6h
+             			dw 0302h, 0409h, 64
  
 ; Set Device Address Request (First Address is 1)  
 ;

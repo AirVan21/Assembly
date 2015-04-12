@@ -35,15 +35,18 @@ sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 
 sDeviceDescriptorMsg  db 13, 10, "Get Device Descriptor   ", 13, 10, "$"
 sDeviceEnumerationMsg db 13, 10, "Device Enumeration      ", 13, 10, "$"
+sStringDescriptorMsg  db 13, 10, "Get String Descriptor   ", 13, 10, "$"
+sInterfaceDescriptMsg db 13, 10, "Get Interface Descriptor   ", 13, 10, "$"
 sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor      ", 13, 10, "$"
 sHubStatusMsg 	  	  db 13, 10, "Get Hub Status          ", 13, 10, "$"
 sDeviceConfigMsg 	  db 13, 10, "Get Device Configuration", 13, 10, "$"
 sSetDeviceConfigMsg	  db 13, 10, "Set Device Configuration", 13, 10, "$"
 sConfigDescMsg 	  	  db 13, 10, "Get Device Config Descriptor", 13, 10, "$"
 sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
-sPortPowerOnMsg 	  db 13, 10, "Ports Power is On    	  ", 13, 10, "$"
-sPortEnableMsg 	  	  db 13, 10, "Enable Ports        	  ", 13, 10, "$"
-sConnectedDevNumMsg	  db "Number of Connected Devices = $"
+sPortPowerOnMsg 	  db 		 "Ports Power is On    	  ", 13, 10, "$"
+sPortEnableMsg 	  	  db 		 "Enable Ports        	  ", 13, 10, "$"
+sConnectedDevNumMsg	  db 		 "Number of Connected Devices = $"
+sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 
 ; =====================================================================================================
 
@@ -72,9 +75,7 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		call processUSBDevice
 
 		;-------------------------------------; 
-		
-		;GET_STATUS (device)  
-		;call getDeviceStatusTransaction
+
 		
 		;DUMP 
 		;call printTDArrayDump
@@ -533,15 +534,14 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		call initTransferStrucutresParametes 
 		; GET_DESCRIPTOR (Device)
 		call getDeviceDescTransaction
-		; Update Max Packet Size 
-		call updateEndpointParamInQH
 		; Set Device Address
 		call setDeviceAddrTransaction
 		; Get Configuration Descriptor 
 		call getConfigDescTransaction
 		; Set Device Configuration
 		call setDeviceConfigTransaction
-
+		
+		; HUB testing 
 		cmp [DDbDeviceClass], 09h
 		jnz OutProcessUSBDevice
 		
@@ -553,8 +553,15 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		call setPowerHubPortsTransaction
 		; Enables Hub Ports 
 		call enableHubPortsTransaction
-	  
+	    
+	    jmp OutProcessUSBHubDevice
+
 	  OutProcessUSBDevice:
+		
+		; Get String Descriptor
+		call getStringDescTransaction
+	
+	  OutProcessUSBHubDevice:
 
 		;------------------------;
 		pop eax 				 ; 
@@ -576,13 +583,21 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 		mov ah, 09h 			 
 		lea dx, sDeviceDescriptorMsg
-		int 21h 
+		int 21h
 
-		; Setup Transaction
+		; Transaction
+		lea esi, GetDeviceDescReq8
+		call performAQSetupTransaction
+		call performAQInTransaction
+		mov esi, [LinearWriteBufferAddress]
+		call retrieveDeviceDescriptor
+		
+		; Update Max Packet Size 
+		call updateEndpointParamInQH
+
+		; Transaction
 		lea esi, GetDeviceDescReq18
 		call performAQSetupTransaction
-
-		; In Transaction
 		call performAQInTransaction
 
 		; Prints Result 
@@ -609,9 +624,9 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		push dx 				 ;
 		;------------------------;
 		
-		mov ah, 09h 			 
-		lea dx, sDeviceEnumerationMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sDeviceEnumerationMsg
+		;int 21h 
 
 		; Increments Device Address
 		inc [SetDeviceAddrReq + 2]
@@ -644,9 +659,9 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		push dx 				 ;
 		;------------------------;
 		
-		mov ah, 09h 			 
-		lea dx, sSetDeviceConfigMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sSetDeviceConfigMsg
+		;int 21h 
 
 		; Setup token 
 		xor dx, dx 
@@ -677,9 +692,9 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		push dx 				 ; 
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sDeviceConfigMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sDeviceConfigMsg
+		;int 21h 
 
 		; Setup Transaction
 		lea esi, GetConfigReq
@@ -707,21 +722,26 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		push dx 				 ; 
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sConfigDescMsg	
-		int 21h 
-
+		;mov ah, 09h 			 
+		;lea dx, sConfigDescMsg	
+		;int 21h 
+		
 		; Setup Transaction
 		lea esi, GetConfigDescReq
 		call performAQSetupTransaction
-
 		; In Transaction
 		call performAQInTransaction
-
 		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
 		call retrieveConfigDescriptor
 		call printConfigDescriptor
+		
+		; Setup Transaction
+		lea esi, GetConfigDescReq64
+		mov dx, [CDwTotalLength]
+		mov [esi + wLengthOffset], dx  
+		call performAQSetupTransaction
+		call performAQInTransaction
 
 		;------------------------;
 		pop dx 					 ; 
@@ -851,7 +871,7 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 		push esi 				 ;
 		push eax 				 ;
-		push dx 				 ; 
+		push edx 				 ; 
 		push cx 				 ; 
 		push bx 				 ; 
 		;------------------------; 
@@ -879,10 +899,6 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
         inc dx 
         mov word ptr [GetPortStatusReq + 4], dx
 
-        ; Port Number 
-        ;push dx 
-        ;call printWordFromStackRM
-
         ; Gets Port Status 
         call getPortStatusTransaction
         mov edx, dword ptr [LinearWriteBufferAddress]
@@ -890,8 +906,8 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
        
         ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
         test eax, 00010000h
-        jz enableNextHubPort	
-        
+        jz enableNextHubPort
+                
         ; Update Port number
         mov dx, word ptr [GetPortStatusReq + 4]
         mov word ptr [SetPortFeatureReq + 4], dx
@@ -900,24 +916,18 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
         ;------------------------------------------;
 		; CLEAR_FEATURE (C_PORT_CONNECTION)
         
-        mov dx, featureC_PORT_CONNECT
-        mov word ptr [ClearPortFeatureReq + 2], dx 
-
-        ; Setup Transaction
+        mov word ptr [ClearPortFeatureReq + 2], featureC_PORT_CONNECT 
+        ; Transaction
 		lea esi, ClearPortFeatureReq
 		call performAQSetupTransaction
-
-		; In Transaction
 		call performAQInTransaction
 
         ;------------------------------------------;
         ; SET_FEATURE (PORT_RESET)
         
-        mov dx, featurePORT_RESET
-        mov word ptr [SetPortFeatureReq + 2], dx 
+        mov word ptr [SetPortFeatureReq + 2], featurePORT_RESET 
 
-        ; Setup Transaction
-		lea esi, SetPortFeatureReq
+        lea esi, SetPortFeatureReq
 		call performAQSetupTransaction
 
 		; In Transaction
@@ -926,28 +936,18 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		;------------------------------------------;
         ; CLEAR_FEATURE (С_PORT_RESET)
         
-        mov dx, featureC_PORT_RESET
-        mov word ptr [ClearPortFeatureReq + 2], dx 
+        mov word ptr [ClearPortFeatureReq + 2], featureC_PORT_RESET 
 
         ; Setup Transaction
 		lea esi, ClearPortFeatureReq
 		call performAQSetupTransaction
-
-		; In Transaction
 		call performAQInTransaction
-
-		; Saves Valid Hub Address
-		mov dl, [ValidDeviceAddress]
-		
-		; Handle Connected USB Device 
-		call processUSBDevice
-
-		; Recover Valid Hub Address
-		mov [ValidDeviceAddress], dl 
-
-		inc [ConncetedUSBDeviceAmount]
 		
 		;------------------------------------------;
+
+		call retrieveUSBDeviceTypeAndProcess
+
+		inc [ConncetedUSBDeviceAmount]
 
 	  enableNextHubPort:
  
@@ -967,7 +967,7 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		;------------------------;
 		pop bx 					 ;
 		pop cx 					 ; 
-		pop dx 					 ; 
+		pop edx 			     ; 
 		pop eax 				 ; 
 		pop esi            		 ; Recover 
 
@@ -975,6 +975,55 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 	endp  
 	
+	; Retrieves UBS Device Type 
+	; Process High Speed USB device (Skip other)
+	;
+	retrieveUSBDeviceTypeAndProcess proc near
+
+		push eax 				 ;
+		push edx 				 ; 
+		;------------------------; 
+
+		; Gets Port Status 
+        call getPortStatusTransaction
+        mov edx, dword ptr [LinearWriteBufferAddress]
+        mov eax, fs:[edx]
+
+        ; LOW_SPEED Device Connected (Skip processing) 
+        test eax, 00000200h      ; 9-th bit is LOW_SPEED indicator
+        jnz lowSpeedDeviceOnPort	
+
+		; Saves Valid Hub Address
+		mov dl, [ValidDeviceAddress]
+		
+		; Handle Connected USB Device 
+		call processUSBDevice
+
+		; Recover Valid Hub Address
+		mov [ValidDeviceAddress], dl
+
+		jmp outRetrieveUSBDeviceTypeAndProcess
+
+		;------------------------------------------;
+	  
+	  lowSpeedDeviceOnPort:
+	  	
+	  	mov ah, 09h
+	  	lea dx, sLowSpeedDevice
+	  	int 21h 
+
+		;------------------------------------------;
+	
+	outRetrieveUSBDeviceTypeAndProcess:
+	
+		;------------------------; 
+		pop edx 			     ; 
+		pop eax 				 ; 
+		
+		ret
+
+	endp 
+
 	; Updates Endpoint Characteristics (Max Packet Size) 
 	;
 	updateEndpointParamInQH proc near
@@ -992,7 +1041,7 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 		add eax, ebx 			 ; Update QHEndpoint Characteristics Value
 		mov [QHEndpointParam], eax 
-	
+
 		;------------------------;
 		pop eax                  ; 
 		pop ebx            		 ; 
@@ -1031,47 +1080,36 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 
 	endp
 
-	; Performs GET_HUB_STATUS transaction 
-	; Prints main fields 
+	; Performs GET_DESCRIPTOR (String) transaction 
+	; Prints String Result
 	; 
-	getDeviceStatusTransaction proc near
+	getStringDescTransaction proc near
 
 		push esi 				 ;
 		push eax 				 ;
-		push dx 				 ; 
+		push dx 				 ;
+		push cx                  ;
 		;------------------------;
 
-		;mov ah, 09h 			 
-		;lea dx, sHubDescriptorMsg
-		;int 21h 
-
+		mov ah, 09h 			 
+		lea dx, sStringDescriptorMsg
+		int 21h 
+		
+		mov cx, 16               ; Cleaning Parameter
+		call emptyOutWriteBuffer
+		
 		; Setup Transaction
-		call createQueueHead
-		lea esi, GetDeviceStatusReq
-		call createSetupQTD
-		call runAQueueinCMD
-		call Wait05s
-		call stopAQueueinCMD
-		call printQTDStatus
-
+		lea esi, GetStrDescReq64
+		; Checking possible language 
+		call performAQSetupTransaction
 		; In Transaction
-		mov ax, [esi + wLengthOffset] ; Bytes to Transfer
-		mov [InBytes], ax 			  ; Update IN Bytes field 
-		call createQueueHead
-		call createInQTD
-		call runAQueueinCMD
-		call Wait05s 
-		call stopAQueueinCMD
-		call printQTDStatus
-
-		; Prints Result 
-		;mov esi, [LinearWriteBufferAddress]
-		;call retrieveHubDescriptor
-		;call printHubDescriptor
-
-		call printOutBufferDump
+		call performAQInTransaction
+		; Print Description
+		mov esi, [LinearWriteBufferAddress]
+		call printStringDescriptor
 
 		;------------------------;
+		pop cx                   ;
 		pop dx 					 ; 
 		pop eax 				 ; 
 		pop esi            		 ; Recover 
@@ -1092,6 +1130,7 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		mov [ValidDeviceAddress], bl 
 		mov [ValidEndpoint], bl 
 		mov [InBytes], bx
+		mov [QHEndpointParam], QHEndpointHighSpeed
 
 		;------------------------;
 		pop ebx            		 ; 
@@ -1099,5 +1138,34 @@ sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 		ret 
 
 	endp
+
+	; Clears Write Buffer 
+	;
+	; CX - contains amount of 4-bytes 
+	emptyOutWriteBuffer proc near
+
+		push cx 
+		push eax
+		push ebx
+		;------------------------;
+
+		mov ebx, [LinearWriteBufferAddress]
+		xor eax, eax  
+
+	  emptyOutWriteBufferloop:
+
+	  	mov fs:[ebx], eax 
+	  	add ebx, 4
+
+	  	loop emptyOutWriteBufferloop
+		
+		;------------------------;
+		pop cx 
+		pop eax 
+		pop ebx 
+
+		ret 
+
+	endp 
 
 endm
