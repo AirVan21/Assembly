@@ -13,6 +13,11 @@ FUNCTION_STEP = 100h      ; Function Step on PCI detour
 OUT_OF_BUS    = 800000h   ; First out of Bus digit
 HC_AMOUNT	  = 16        ; Maximum Amount of Host Controllers 
 
+UHCI_ProgIF	  = 00h       ; 
+OHCI_ProgIF   = 10h		  ; 
+EHCI_ProgIF   = 20h       ; 
+xHCI_ProgIF   = 30h       ;
+
 ; PCI Configuration space registers displacement
 DEVICE_VENDOR = 0h       ; (Device[31-16],Vendor[15-0) 
 CLASS_SUBCLASS = 08h     ; (ClassCode[31-24], SubClass[23-16], Prog IF[15-8], Revision ID[7-0])
@@ -47,6 +52,8 @@ HCPCIParamStorage:
 ;
 NumberOfValidHC dw 		0h
 
+PCIParameter	dd 		0h 
+
 ; =====================================================================================================
 
 	; Main Search Function
@@ -77,6 +84,7 @@ NumberOfValidHC dw 		0h
 		shr eax, 16            ; Class-SubClass in ax 
 		cmp  ax, USB_ID        ; It is USB HC device?
 		pop  eax               ; Recover EAX
+
 		
 		jz processUSBHC        ; Handle USB HCs  
 		
@@ -177,7 +185,7 @@ NumberOfValidHC dw 		0h
 		push edi                ;
 	 	;-----------------------;
 
-	 	mov edi, eax            ; Class information about PCI Device 
+	 	mov edi, eax 		    ; Class information about PCI Device 
 		push ecx                ; Store PCI Address (which should be stored)
 		
 		; Saves Base Address to Storage

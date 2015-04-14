@@ -6,6 +6,7 @@ initPrint	macro
 hex_table db "0123456789ABCDEF"
 newline   db " ", 13, 10, "$"
 space     db " : $"
+formatStep db "  $"
 
 ; =====================================================================================================
 
@@ -21,10 +22,11 @@ PortValue:
 ; =====================================================================================================
 ; String CONSTS 
 
-usb_00    db ' UHCI (Universal Host Controller)$'
-usb_10    db ' OHCI (Open Host Controller)$'
-usb_20    db ' EHCI (Enhanced Host Controller)$'
-usb_30    db ' xHCI (Extensible Host Controller)$'
+usb_00    db 'UHCI (Universal Host Controller)', 13, 10, '$'
+usb_10    db 'OHCI (Open Host Controller)',      13, 10, '$'
+usb_20    db 'EHCI (Enhanced Host Controller)',  13, 10, '$'
+usb_30    db 'xHCI (Extensible Host Controller)',13, 10, '$'
+usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 
 ; =====================================================================================================
 
@@ -205,6 +207,32 @@ usb_30    db ' xHCI (Extensible Host Controller)$'
 		lea dx, newline         ; DX - address of new line string 
 		int 21h                 ; MS-DOS call 
 
+		pop dx 					; Recover Registers
+		pop ax 
+
+		ret
+
+	endp
+
+	; Prints format Step  
+	;
+	printFormatStepRM proc near
+
+		push ax 				; Save Registers 
+		push dx                 ;
+		;-----------------------;
+
+		mov cx, [TreeLevel]
+
+	  loopFormateStep:
+
+		mov ah, 09h             ; Print String Function 
+		lea dx, formatStep      ; DX - address of new line string 
+		int 21h                 ; MS-DOS call
+
+		loop loopFormateStep 
+        
+        ;-----------------------;
 		pop dx 					; Recover Registers
 		pop ax 
 
@@ -506,6 +534,27 @@ usb_30    db ' xHCI (Extensible Host Controller)$'
 
 		db 0C3h                ; ret
 
-	endp  
+	endp
+
+	; Prints Message 
+	;
+	dummyHCPrint proc near
+
+		push ax                ;
+		push dx				   ; Save dx
+		;----------------------;
+
+		mov ah, 09h 
+		lea dx, usb_dummy
+		int 21h 
+
+		;----------------------;
+		pop dx                 ; Recover DX
+		pop ax                 ;
+
+		db 0C3h                ; ret
+
+	endp
+
 
 endm

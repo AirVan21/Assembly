@@ -11,7 +11,9 @@ HCBaseAddress 		dd 0h
 USBLEGSUPReg		dd 0h
 USBLEGCTLSTSReg 	dd 0h
 
-ConncetedUSBDeviceAmount	dw 0h 
+ConncetedUSBDeviceAmount	dw 0h
+TreeLevel					dw 0h 
+NumberOfHCPorts				dw 0h  
 
 ; Paragraph style 
 FrameAddress 		dw 0h
@@ -33,26 +35,28 @@ sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
 sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
 sHCInitDone 	 db "HC Init Done", 13, 10, "$"
 
-sDeviceDescriptorMsg  db 13, 10, "Get Device Descriptor   ", 13, 10, "$"
-sDeviceEnumerationMsg db 13, 10, "Device Enumeration      ", 13, 10, "$"
-sStringDescriptorMsg  db 13, 10, "Get String Descriptor   ", 13, 10, "$"
-sInterfaceDescriptMsg db 13, 10, "Get Interface Descriptor   ", 13, 10, "$"
-sHubDescriptorMsg 	  db 13, 10, "Get Hub Descriptor      ", 13, 10, "$"
-sHubStatusMsg 	  	  db 13, 10, "Get Hub Status          ", 13, 10, "$"
-sDeviceConfigMsg 	  db 13, 10, "Get Device Configuration", 13, 10, "$"
-sSetDeviceConfigMsg	  db 13, 10, "Set Device Configuration", 13, 10, "$"
-sConfigDescMsg 	  	  db 13, 10, "Get Device Config Descriptor", 13, 10, "$"
-sPortStatusMsg 	  	  db 13, 10, "Port Status    		  ", 13, 10, "$"
-sPortPowerOnMsg 	  db 		 "Ports Power is On    	  ", 13, 10, "$"
-sPortEnableMsg 	  	  db 		 "Enable Ports        	  ", 13, 10, "$"
-sConnectedDevNumMsg	  db 		 "Number of Connected Devices = $"
-sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
+sDeviceDescriptorMsg  db "Get Device Descriptor   ", 13, 10, "$"
+sDeviceEnumerationMsg db "Device Enumeration      ", 13, 10, "$"
+sStringDescriptorMsg  db "Get String Descriptor   ", 13, 10, "$"
+sInterfaceDescriptMsg db "Get Interface Descriptor   ", 13, 10, "$"
+sHubDescriptorMsg 	  db "Get Hub Descriptor      ", 13, 10, "$"
+sHubStatusMsg 	  	  db "Get Hub Status          ", 13, 10, "$"
+sDeviceConfigMsg 	  db "Get Device Configuration", 13, 10, "$"
+sSetDeviceConfigMsg	  db "Set Device Configuration", 13, 10, "$"
+sConfigDescMsg 	  	  db "Get Device Config Descriptor", 13, 10, "$"
+sPortStatusMsg 	  	  db "Port Status    		  ", 13, 10, "$"
+sPortPowerOnMsg 	  db "Ports Power is On    	  ", 13, 10, "$"
+sPortEnableMsg 	  	  db "Enable Ports        	  ", 13, 10, "$"
+sConnectedDevNumMsg	  db "Number of Connected Devices = $"
+sLowSpeedDevice	  	  db "Low  Speed Device", 13, 10, "$"
+sHighSpeedDeice		  db "High Speed Device", 13, 10, "$"
+
+sRootHubPort		  db "Root Hub Port : $"
 
 ; =====================================================================================================
 
  	; Prints information about HC I/O Registers 
 	;
-	; EBX - contains BAR address | Or Not 
 	; FS  - contains Selector For Zero Memory
 	processEHCIHC proc near  
 
@@ -64,15 +68,18 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 				
 		; Rests HC and Inits Registers
 		call performInitialWorkaround
-		
 		call Wait05s
+		
 
 		; Resets powered ports 
 		call updatePORTstate
 		call Wait05s
+		; Init Log Print Tree  
+		mov [TreeLevel], 1h 
+		; Runs Device Detour 
 		call updatePORTstateReset
-
-		call processUSBDevice
+		call processUSBDevice 
+     
 
 		;-------------------------------------; 
 
@@ -110,7 +117,6 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 
 		;call testPortFunctions
 		;call Wait05s 
-		;call updatePORTstateReset
   	  
 
   		;------------------------;
@@ -139,25 +145,25 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		call takeEHCIOwnership	 ;
 
 		; Info message 
-		mov ah, 09 				 ;
-		lea dx, sTakeBIOSControl ; 
-		int 21h                  ;
+		;mov ah, 09 				 ;
+		;lea dx, sTakeBIOSControl ; 
+		;int 21h                  ;
 		
 		; Resets HC to Default state
 		call performHCReset		 ; 
 
 		; Info message 
-		mov ah, 09 				 ;
-		lea dx, sHCResetDone	 ;  
-		int 21h                  ;
+		;mov ah, 09 				 ;
+		;lea dx, sHCResetDone	 ;  
+		;int 21h                  ;
 
 		; Init Host Controler 
 		call initializeHC		 ;
 
 		; Info message 
-		mov ah, 09 				 ;
-		lea dx, sHCInitDone		 ; 
-		int 21h                  ;
+		;mov ah, 09 				 ;
+		;lea dx, sHCInitDone		 ; 
+		;int 21h                  ;
 		
 		;------------------------;
 		pop dx 					 ;
@@ -416,7 +422,8 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		mov ecx, fs:[ebx]		 ; HCPARAMS Register in ecx 
 		and ecx, 000Fh 			 ; Set only N_PORTS Value 
 		
-								 ; CX - contains number of ports 
+								 ; CX - contains number of ports
+		mov [NumberOfHCPorts], cx; Number of HC ports  
 
 		xor eax, eax 			 ;
 		mov ax, OperRegOff
@@ -447,6 +454,9 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 	  	add edi, 04h             ; 32-bit step 
 	  	loop loopOnPORTstate	 ; Loop 
 
+	  outUpdatePORTstate:
+
+
 		;------------------------;
 		pop edi 				 ;
 		pop ecx                  ; 
@@ -465,6 +475,7 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		push eax           		 ; 
 		push ecx                 ;
 		push edi 				 ; 
+		push dx                  ;
 		;------------------------;
 
 		mov ebx, HCBaseAddress	 ; Base Address For HC 
@@ -488,10 +499,28 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
 		mov fs:[edi], eax 		 ; Apply Changes
 
+		;mov eax, fs:[edi]        ;
+		;test eax, 1h             ;
+		;jz nextLoopOnPORTstateReset
+		
+		;------------------------;
+		
+		;call printFormatStepRM 
+		
+		;lea dx, sRootHubPort 
+		;mov ah, 09h 
+		;int 21h
+
+		;------------------------;
+					 
+	  nextLoopOnPORTstateReset:
+
 	  	add edi, 04h             ; 32-bit step 
+
 	  	loop loopOnPORTstateReset; Loop 
 
 		;------------------------;
+		pop dx                   ; 
 		pop edi 				 ;
 		pop ecx                  ; 
 		pop eax                  ; Recover edi
@@ -734,7 +763,7 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
 		call retrieveConfigDescriptor
-		call printConfigDescriptor
+		;call printConfigDescriptor
 		
 		; Setup Transaction
 		lea esi, GetConfigDescReq64
@@ -762,9 +791,9 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		push dx 				 ; 
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sHubDescriptorMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sHubDescriptorMsg
+		;int 21h 
 
 		; Setup Transaction
 		lea esi, GetHubDescReq
@@ -827,9 +856,9 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		; Setting Default Port 
 		mov word ptr [SetPortFeatureReq + 4], 0h
 
-		mov ah, 09h
-        lea dx, sPortPowerOnMsg
-        int 21h 
+		;mov ah, 09h
+        ;lea dx, sPortPowerOnMsg
+        ;int 21h 
 
 	  setPowerOverPortOnHub:
 
@@ -888,9 +917,9 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		; Connected Device Amount 
 		mov word ptr [ConncetedUSBDeviceAmount], 0h 
 
-		mov ah, 09h
-        lea dx, sPortEnableMsg
-        int 21h 
+		;mov ah, 09h
+        ;lea dx, sPortEnableMsg
+        ;int 21h 
 
 	  enableHubPortsOnHub:
 
@@ -1060,9 +1089,9 @@ sLowSpeedDevice	  	  db 		 "Low Speed Device", 13, 10, "$"
 		push dx 				 ; 
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sHubStatusMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sHubStatusMsg
+		;int 21h 
 
 		; Setup Transaction
 		lea esi, GetHubStatusReq
