@@ -220,6 +220,7 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 
 		push ax 				; Save Registers 
 		push dx                 ;
+		push cx                 ; 
 		;-----------------------;
 
 		mov cx, [TreeLevel]
@@ -233,6 +234,7 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 		loop loopFormateStep 
         
         ;-----------------------;
+        pop cx                  ;
 		pop dx 					; Recover Registers
 		pop ax 
 

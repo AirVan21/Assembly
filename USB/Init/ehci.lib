@@ -77,8 +77,7 @@ sRootHubPort		  db "Root Hub Port : $"
 		; Init Log Print Tree  
 		mov [TreeLevel], 1h 
 		; Runs Device Detour 
-		call updatePORTstateReset
-		call processUSBDevice 
+		call updatePORTstateReset 
      
 
 		;-------------------------------------; 
@@ -499,18 +498,20 @@ sRootHubPort		  db "Root Hub Port : $"
 		and eax, 0FFFFFEFFh      ; (Fix 8-bit)
 		mov fs:[edi], eax 		 ; Apply Changes
 
-		;mov eax, fs:[edi]        ;
-		;test eax, 1h             ;
-		;jz nextLoopOnPORTstateReset
+		mov eax, fs:[edi]        ;
+		test eax, 1h             ;
+		jz nextLoopOnPORTstateReset
 		
 		;------------------------;
 		
-		;call printFormatStepRM 
-		
-		;lea dx, sRootHubPort 
-		;mov ah, 09h 
-		;int 21h
+		call printFormatStepRM
 
+		lea dx, sRootHubPort 
+		mov ah, 09h 
+		int 21h
+
+		call processUSBDevice 
+		
 		;------------------------;
 					 
 	  nextLoopOnPORTstateReset:
