@@ -22,11 +22,12 @@ PortValue:
 ; =====================================================================================================
 ; String CONSTS 
 
-usb_00    db 'UHCI (Universal Host Controller)', 13, 10, '$'
-usb_10    db 'OHCI (Open Host Controller)',      13, 10, '$'
-usb_20    db 'EHCI (Enhanced Host Controller)',  13, 10, '$'
-usb_30    db 'xHCI (Extensible Host Controller)',13, 10, '$'
+usb_00    db 'UHCI (Universal Host Controller)$'
+usb_10    db 'OHCI (Open Host Controller)$'
+usb_20    db 'EHCI (Enhanced Host Controller)$'
+usb_30    db 'xHCI (Extensible Host Controller)$'
 usb_dummy db '  Host Controller is not supported', 13, 10, '$'
+sBusMsg	  db ', Bus = $'
 
 ; =====================================================================================================
 
@@ -496,11 +497,13 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 
 	; Prints information about USB class
 	;
-	; AX - containes USB HC class parameter
+	; AX  - containes USB HC class parameter
+	; EDI - containes offset of HC Parameters 
 	displayUSBtype proc near 
 
-		push ax                ;
-		push dx				   ; Save dx 
+		push eax               ;
+		push edx				   ; Save dx 
+		;----------------------;
 
 		; AX - parameter
 		cmp ax, 0h             ;
@@ -527,12 +530,15 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 	  showusb30:
 		lea dx, usb_30         ; Sets Appropriate String 
 
-	  outUSBtype:                ; Point to jump out of type definition
+	  outUSBtype:              ; Point to jump out of type definition
 		mov ah, 09h            ; Print string
 		int 21h                ;
 
-		pop dx                 ; Recover DX
-		pop ax                 ;
+		call printNewLineRM
+
+		;----------------------;
+		pop edx                ; Recover DX
+		pop eax                ;
 
 		db 0C3h                ; ret
 
@@ -548,7 +554,7 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 
 		mov ah, 09h 
 		lea dx, usb_dummy
-		int 21h 
+		int 21h
 
 		;----------------------;
 		pop dx                 ; Recover DX
@@ -558,5 +564,36 @@ usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 
 	endp
 
+	; Prints Bus Number 
+	;
+	printBusNumber proc near 
+
+		push eax               ;
+		push edx			   ; Save dx
+		;----------------------;
+
+		lea dx, sBusMsg
+		mov ah, 09h 
+		int 21h
+
+		;lea edx, HCPCIAddressStorage
+		;add edx, edi
+		;mov eax, [edx]
+		
+		;push ax
+		;shr eax, 16
+		;push ax 
+		;call printWordFromStackRM
+		;call printWordFromStackPM
+		
+		call printNewLineRM
+		
+		;----------------------;
+		pop edx                ; Recover DX
+		pop eax                ;
+
+		db 0C3h                ; ret
+
+	endp
 
 endm

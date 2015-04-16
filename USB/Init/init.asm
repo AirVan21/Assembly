@@ -7,6 +7,7 @@
 	include pciconf.lib
 	include control.lib
 	include xhci.lib
+	include xhciCap.lib
 	USBCode segment use16
 	assume	cs:USBCode, ds:USBCode, es:USBCode
 	.386p
@@ -49,6 +50,7 @@ start:
 	shr ax, 8                  		; ProgIF in AL
 	and ax, 00FFh 				    ; 
 
+	; edi - contains offset for HC Addresses
 	call displayUSBtype             ;  
 
 	cmp al, xHCI_ProgIF             ; xHCI HC 
@@ -60,6 +62,7 @@ start:
 	jmp handleOtherHC
   
   handleXHCI:
+  	;call dummyHCPrint               ; 'No support' print 	
 	call processXHCIHC              ; Main xHCI Function
 	jmp NextOverHCloop
   
@@ -73,7 +76,8 @@ start:
   NextOverHCloop:
 	
 	add edi, 4                      ; Offset for HC Addresses 
-
+	call printNewLineRM
+    
     loop loopOverHC  
 
   outLoopOverHC:
@@ -92,6 +96,7 @@ initMessageLib
 initCapacityInfo
 initPCIConfig
 initControlLib
+initCapacityInfoXHCI
 
 ; =====================================================================================================
 

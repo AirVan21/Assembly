@@ -3,13 +3,13 @@ initEHCI macro
 ; =====================================================================================================
 ; Variables
 
-EECPvalue			dw 0h 	
+EECPvalue					dw 0h 	
 
-OperRegOff 			dw 20h
-HCPCIAddress 		dd 0h
-HCBaseAddress 		dd 0h 
-USBLEGSUPReg		dd 0h
-USBLEGCTLSTSReg 	dd 0h
+OperRegOff 					dw 20h
+HCPCIAddress 				dd 0h
+HCBaseAddress 				dd 0h 
+USBLEGSUPReg				dd 0h
+USBLEGCTLSTSReg 			dd 0h
 
 ConncetedUSBDeviceAmount	dw 0h
 TreeLevel					dw 0h 
@@ -49,9 +49,12 @@ sPortPowerOnMsg 	  db "Ports Power is On    	  ", 13, 10, "$"
 sPortEnableMsg 	  	  db "Enable Ports        	  ", 13, 10, "$"
 sConnectedDevNumMsg	  db "Number of Connected Devices = $"
 sLowSpeedDevice	  	  db "Low  Speed Device", 13, 10, "$"
-sHighSpeedDeice		  db "High Speed Device", 13, 10, "$"
+sHighSpeedDeice		  db "High Speed Device,$"
+sHighSpeedHub		  db "High Speed Hub,$"
 
 sRootHubPort		  db "Root Hub Port : $"
+sHubPort		  	  db "Hub Port $"
+sHSDeviceAddr		  db " Addr = $"
 
 ; =====================================================================================================
 
@@ -64,13 +67,12 @@ sRootHubPort		  db "Root Hub Port : $"
 		
 		push ebx           		 	; Save 
 		push esi				 	;
-		;---------------------------;
-				
+		;---------------------------;	
+		
 		; Rests HC and Inits Registers
 		call performInitialWorkaround
 		call Wait05s
 		
-
 		; Resets powered ports 
 		call updatePORTstate
 		call Wait05s
@@ -78,7 +80,9 @@ sRootHubPort		  db "Root Hub Port : $"
 		mov [TreeLevel], 1h 
 		; Runs Device Detour 
 		call updatePORTstateReset 
-     
+     	
+     	; Handles User Input 
+     	;call handleUserInput
 
 		;-------------------------------------; 
 
@@ -581,6 +585,8 @@ sRootHubPort		  db "Root Hub Port : $"
 		call getHubStatusTransaction
 		; SET_FEATURE (PORT_POWER) for HUB 
 		call setPowerHubPortsTransaction
+		; For Print Style
+		inc [TreeLevel]
 		; Enables Hub Ports 
 		call enableHubPortsTransaction
 	    
@@ -589,7 +595,7 @@ sRootHubPort		  db "Root Hub Port : $"
 	  OutProcessUSBDevice:
 		
 		; Get String Descriptor
-		call getStringDescTransaction
+		;call getStringDescTransaction
 	
 	  OutProcessUSBHubDevice:
 
@@ -602,7 +608,7 @@ sRootHubPort		  db "Root Hub Port : $"
 	endp
 
 	; Performs GET_DESCRIPTOR (Device) transaction 
-	; Prints main fields 
+	; Prints main fields (High-Speed Devices) 
 	;
 	getDeviceDescTransaction proc near 
 		
@@ -611,9 +617,9 @@ sRootHubPort		  db "Root Hub Port : $"
 		push dx 				 ;  
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sDeviceDescriptorMsg
-		int 21h
+		;mov ah, 09h 			 
+		;lea dx, sDeviceDescriptorMsg
+		;int 21h
 
 		; Transaction
 		lea esi, GetDeviceDescReq8
@@ -630,11 +636,32 @@ sRootHubPort		  db "Root Hub Port : $"
 		call performAQSetupTransaction
 		call performAQInTransaction
 
-		; Prints Result 
 		mov esi, [LinearWriteBufferAddress]
 		call retrieveDeviceDescriptor
-		call printDeviceDescriptor
+		; Prints Result 
+		;call printDeviceDescriptor
 
+		; HUB testing 
+		cmp [DDbDeviceClass], 09h
+		jnz highSpeedDeiceMsgPrint
+
+
+		;-------------------------------;
+		; Tracing Code                  ; 
+		
+		mov ah, 09h 
+		lea dx, sHighSpeedHub
+		int 21h
+		jmp outGetDeviceDescTransaction
+
+	  highSpeedDeiceMsgPrint:	 
+	
+		mov ah, 09h 
+		lea dx, sHighSpeedDeice
+		int 21h  
+	  
+	  outGetDeviceDescTransaction:
+		
 		;------------------------;
 		pop dx 					 ; 
 		pop eax 				 ; 
@@ -669,7 +696,24 @@ sRootHubPort		  db "Root Hub Port : $"
 		xor ax, ax 
 		mov ax, word ptr [SetDeviceAddrReq + 2] ; Remember updated Device Address
 		mov [ValidDeviceAddress], al  			; Saves Valid Device Address  
-				
+		
+		;----------------------;
+		; Log Print            ; 
+		
+		mov ah, 09h
+		lea dx, sHSDeviceAddr
+		int 21h
+		mov ax, word ptr [SetDeviceAddrReq + 2]
+		push ax 
+		call printByteFromStackRM
+
+		; HUB testing 
+		cmp [DDbDeviceClass], 09h
+		jz outSetDeviceAddrTransaction
+		call printNewLineRM 
+      
+      outSetDeviceAddrTransaction:
+	
 		;------------------------;
 		pop dx 					 ; 
 		pop eax 				 ; 
@@ -937,12 +981,20 @@ sRootHubPort		  db "Root Hub Port : $"
         ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
         test eax, 00010000h
         jz enableNextHubPort
-                
+
         ; Update Port number
         mov dx, word ptr [GetPortStatusReq + 4]
         mov word ptr [SetPortFeatureReq + 4], dx
         mov word ptr [ClearPortFeatureReq + 4], dx  
-
+		;------------------------------------------;
+		; Prints 
+		push dx 
+		call printFormatStepRM
+		mov ah, 09h
+		lea dx, sHubPort
+		int 21h
+		call printByteFromStackRM
+		call printSpaceRM
         ;------------------------------------------;
 		; CLEAR_FEATURE (C_PORT_CONNECTION)
         
@@ -986,13 +1038,13 @@ sRootHubPort		  db "Root Hub Port : $"
 	  	;------------------------------------------;
 		; Log info 
 	  	
-	  	mov ah, 09h
-	  	lea dx, sConnectedDevNumMsg
-	  	int 21h 
-	  	mov ax, [ConncetedUSBDeviceAmount]
-		push ax 
-		call printWordFromStackRM
-		call printNewLineRM
+	  	;mov ah, 09h
+	  	;lea dx, sConnectedDevNumMsg
+	  	;int 21h 
+	  	;mov ax, [ConncetedUSBDeviceAmount]
+		;push ax 
+		;call printWordFromStackRM
+		;call printNewLineRM
 
 		;------------------------;
 		pop bx 					 ;
@@ -1040,7 +1092,7 @@ sRootHubPort		  db "Root Hub Port : $"
 	  	
 	  	mov ah, 09h
 	  	lea dx, sLowSpeedDevice
-	  	int 21h 
+	  	int 21h
 
 		;------------------------------------------;
 	
@@ -1196,6 +1248,27 @@ sRootHubPort		  db "Root Hub Port : $"
 
 		ret 
 
-	endp 
+	endp
+
+	; Handle User Input 
+	;
+	; 
+	handleUserInput proc near
+
+		push cx 
+		push eax
+		push ebx
+		;------------------------;
+
+
+		
+		;------------------------;
+		pop cx 
+		pop eax 
+		pop ebx 
+
+		ret 
+
+	endp  
 
 endm

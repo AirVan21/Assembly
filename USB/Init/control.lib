@@ -79,7 +79,7 @@ HDwHubCharact			dw 0h
 ; Hub Descriptor (HD) strings 
 
 HDbDescriptorTypeMsg		db "Descriptor (0x29)   = $"
-HDbNbrPortsMsg				db "Number of Ports     = $"
+HDbNbrPortsMsg				db ", Ports = $"
 
 ; =====================================================================================================
 ; Configuration Descriptor (CD) fields
@@ -383,14 +383,14 @@ PrintBuffer db 64 DUP(0)
 		;------------------------
 
 		; bDescriptorType
-		mov ah, 09h				
-		lea dx, HDbDescriptorTypeMsg
-		int 21h 
-		xor bx, bx 
-		mov bl, [HDbDescriptorType]
-		push bx 
-		call printWordFromStackRM
-		call printSpaceRM
+		;mov ah, 09h				
+		;lea dx, HDbDescriptorTypeMsg
+		;int 21h 
+		;xor bx, bx 
+		;mov bl, [HDbDescriptorType]
+		;push bx 
+		;call printWordFromStackRM
+		;call printSpaceRM
 
 		; HDbNbrPortsMsg
 		mov ah, 09h				
@@ -399,7 +399,7 @@ PrintBuffer db 64 DUP(0)
 		xor bx, bx
 		mov bl, [HDbNbrPorts]
 		push bx 
-		call printWordFromStackRM
+		call printByteFromStackRM
 		call printNewLineRM
 		
 		;-----------------------;

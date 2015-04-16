@@ -16,7 +16,7 @@ HCSPPORTROUTEOffset = 0Ch
 CAPLENGTHMsg	 db "CAPLENGTH | Version    = $"
 HCSPARAMSMsg 	 db "HCSPARAMS   Register   = $"
 HCCPARAMSMsg 	 db "HCCPARAMS   Register   = $"
-HCSPPORTROUTEMSg db "HCSPPORTROUT Register  = $"
+HCSPPORTROUTEMSg db "HCSPPORTR   Register  = $"
 
 ; =====================================================================================================
 ; Capacity Registers Table
@@ -31,7 +31,7 @@ HCSPPORTROUTEReg 	dd 00h
  	; Prints information about HC Capacity I/O Registers 
 	;
 	; FS  - contains Selector For Zero Memory
-	printCapRegInfo proc near
+	printCapRegInfoEHCI proc near
 
 		push ebx           		; Save ebx
 		push edx                ; 
@@ -105,31 +105,10 @@ HCSPPORTROUTEReg 	dd 00h
         ret
 
     endp
-	
-	; Retieves and prints EHCI Revision number 
-	;
-	; EBX - contains Base Address (BAR)
-	; FS  - is used for Addressing 
-	retrieveHCIVERSION proc near
-		
-		push ax			   	    ; Save ax
-		push ebx           		; Save ebx 
-		
-		add ebx, 2         		; Offset for HCIVersion 
-		mov ax, fs:[ebx]   		;   
-						   		; Prints CAPLENGTH
-		push ax            		; CAPLENGTH1
-		call printWordFromStackRM
-		
-		pop ebx          
-		pop ax             		; Recover registers
- 		
-		ret
-	endp
 
 	; Updates information about Capacity Registres in Memory  
 	;
-	updateCapRegInfo proc near
+	updateCapRegInfoEHCI proc near
 		
 		push ebx           		 ; Save Registers  
 		push eax           		 ;
