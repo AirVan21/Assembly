@@ -80,7 +80,9 @@ sHSDeviceAddr		  db " Addr = $"
 		mov [TreeLevel], 1h 
 		; Runs Device Detour 
 		call updatePORTstateReset 
-     	
+		
+     	; 
+     	call returnEHCIOwnership
      	; Handles User Input 
      	;call handleUserInput
 
@@ -541,7 +543,7 @@ sHSDeviceAddr		  db " Addr = $"
     
         push    ES
         push    EAX
-        mov     AX,0
+        mov     AX, 00h
         mov     ES,AX
         mov     EAX,[ES:046Ch]
         inc     EAX
@@ -554,6 +556,31 @@ sHSDeviceAddr		  db " Addr = $"
         ret
 	
 	endp
+
+	; Осуществить задержку AX миллисекунд через int 15h
+	; Ничего не использует, самый простой, но не всегда надёжный способ
+	; Устанавливает флаг CF=CY=1, если функция занята
+	;
+	Int15Delay  proc
+        push cx 
+        push ax 
+        push dx 
+
+        mov cx,1000
+        mul cx             ; Умножаем AX на 1000
+        mov cx,dx
+        mov dx,ax          ; Переносим DX:AX в CX:DX
+        mov ah,86h
+        int 15h            ; Вызываем int 15h
+        
+        pop dx 
+        pop ax 
+        pop cx 
+
+        ret
+	
+	Int15Delay  endp
+
 
 	; MAIN procedure for Device Initialization, Enumeration, Configuration
 	; Processes USB Hubs 
@@ -595,7 +622,8 @@ sHSDeviceAddr		  db " Addr = $"
 	  OutProcessUSBDevice:
 		
 		; Get String Descriptor
-		;call getStringDescTransaction
+		call printFormatStepRM
+		call getStringDescTransaction
 	
 	  OutProcessUSBHubDevice:
 
@@ -638,6 +666,7 @@ sHSDeviceAddr		  db " Addr = $"
 
 		mov esi, [LinearWriteBufferAddress]
 		call retrieveDeviceDescriptor
+		
 		; Prints Result 
 		;call printDeviceDescriptor
 
@@ -659,7 +688,10 @@ sHSDeviceAddr		  db " Addr = $"
 		mov ah, 09h 
 		lea dx, sHighSpeedDeice
 		int 21h  
-	  
+	  	
+	  	; Tracing Code                  ;
+	  	;-------------------------------;
+		
 	  outGetDeviceDescTransaction:
 		
 		;------------------------;
@@ -1173,9 +1205,9 @@ sHSDeviceAddr		  db " Addr = $"
 		push cx                  ;
 		;------------------------;
 
-		mov ah, 09h 			 
-		lea dx, sStringDescriptorMsg
-		int 21h 
+		;mov ah, 09h 			 
+		;lea dx, sStringDescriptorMsg
+		;int 21h 
 		
 		mov cx, 16               ; Cleaning Parameter
 		call emptyOutWriteBuffer
@@ -1269,6 +1301,64 @@ sHSDeviceAddr		  db " Addr = $"
 
 		ret 
 
-	endp  
+	endp
+
+	; Sets HC BIOS ownership bit to one 
+	; Waits until HC OS ownership bit is zero 
+	; 
+	; 
+	returnEHCIOwnership proc near 
+		
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------; 		
+		
+		xor ebx, ebx
+
+		mov eax, HCPCIAddress    ; PCI Address
+		mov bx, EECPvalue        ; Offset from PARAMS Register
+		add eax, ebx 			 ; 
+
+ 		add eax, USBLEGSUPoffset ; 
+ 		mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		mov eax, USBLEGSUPReg	 ; Legacy Support Register
+		or eax, 00010000h 		 ; Sets BIOS Owned bit 
+		and eax, 0FEFFFFFFh      ;
+		out dx, eax				 ; Sets data to PCI device
+		mov USBLEGSUPReg, eax 	 ;
+
+	  	;xor ebx, ebx 			 ; 
+
+	  	;mov eax, HCPCIAddress	 ; HC PCI Address
+	  	;mov bx, EECPvalue 		 ; Value of Legacy USB Displacement 
+ 		;add ebx, eax             ; Storage for PCI Address
+
+ 		; Waits Until BIOS Owned bit is Zero 
+
+	 ; waitOSOwnZero:
+	 
+	 	;mov eax, ebx 			 ; PCI Address 
+		  	
+	  	;mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		;out dx, eax 			 ; Sends request
+		;mov dx, CONFIG_DATA		 ; Sets input PORT address
+		;in  eax, dx				 ; Gets data from PCI device	
+
+		;test eax, 01000000h 	 ;
+
+	  	;jnz waitOSOwnZero		 
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+	
+	endp
 
 endm

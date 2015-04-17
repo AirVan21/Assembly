@@ -121,6 +121,15 @@ PrintBuffer db 64 DUP(0)
 		push eax                ;
 		;------------------------
 
+		; Announce Message Status  
+		mov ebx, [QTDAddress1]	
+		mov eax, [ebx + qTDTokenOffset]
+		
+		cmp al,	qTDOKStatus 
+		jz outprintQTDStatus
+
+		call printNewLineRM	
+
 		; Announce Message type 
 		mov ebx, [QTDAddress1]	
 		mov eax, [ebx + qTDTokenOffset]
@@ -228,6 +237,8 @@ PrintBuffer db 64 DUP(0)
       	int 21h 
 
       	call printNewLineRM
+	
+	outprintQTDStatus:
 
 		;-----------------------;
         pop eax                 ; 
@@ -489,7 +500,7 @@ PrintBuffer db 64 DUP(0)
 		;------------------------
 		
 		lea edx, PrintBuffer		
-		mov cx, 16  
+		mov cx, 32  
 
 		;Prints Unicode Chars
 
