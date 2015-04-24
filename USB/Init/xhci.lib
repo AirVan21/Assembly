@@ -1,0 +1,84 @@
+initXHCI macro
+	
+; =====================================================================================================
+
+ 	; Prints information about HC I/O Registers 
+	;
+	; FS  - contains Selector For Zero Memory
+	processXHCIHC proc near  
+
+		; Include code for Operational Registers Displacement CalCulation 
+		
+		push ebx           		 	; Save 
+		push esi				 	;
+		;---------------------------;
+		
+		; Align Base Address		
+		mov esi, [HCBaseAddress]
+		and si, 0FFF0h
+		mov [HCBaseAddress], esi 
+		
+		;call updateCapRegInfoXHCI
+		;call printCapRegInfoXHCI
+
+
+		; Rests HC and Inits Registers
+		;call performInitialWorkaround
+		;call Wait05s
+		
+		; Resets powered ports 
+		;call updatePORTstate
+		;call Wait05s
+		;call updatePORTstateReset
+
+		;call processUSBDevice
+
+		;-------------------------------------; 
+
+		
+		;DUMP 
+		;call printTDArrayDump
+		;call printOutBufferDump
+		;call printInBufferDump
+
+		; DEBUG 
+		;call updateOperRegInfo
+		;call printOperRegInfo
+		;call printNewLineRM
+		;call printPORTSCinfo
+		;call updateCapRegInfo
+		;call printCapRegInfo
+		;call printNewLineRM
+		;call retrieveLegacyInterruptsEHCI
+		;call printUSBLEGSUPReg
+
+		;call printTDArrayDump
+		
+		; In Transaction
+		;call createQueueHead
+		;call createInQTD
+		
+		;call runAQueueinCMD
+		;call Wait05s 
+		;call stopAQueueinCMD
+		
+		;call printQTDStatus
+		
+		;call printTDArrayDump
+		;call printOutBufferDump
+
+		;call testPortFunctions
+		;call Wait05s 
+		;call updatePORTstateReset
+  	  
+
+  		;------------------------;
+  		pop esi 				 ;
+		pop ebx            		 ; Recover  
+
+
+  		ret                               ; 
+
+	endp
+
+endm
