@@ -8,6 +8,8 @@
 	include control.lib
 	include xhci.lib
 	include xhciCap.lib
+	include bulk.lib
+	include timer.lib 
 	USBCode segment use16
 	assume	cs:USBCode, ds:USBCode, es:USBCode
 	.386p
@@ -17,6 +19,9 @@ main proc far
 
 start:
 	
+	; Check input key parameters
+	call checkInputKey
+
 	; Setting Default PCI Address 
 	; ECX - parameter for searchUSBHCinPCI 
 	mov ecx, (DEFAULT_ADDR + CLASS_SUBCLASS)
@@ -97,6 +102,8 @@ initCapacityInfo
 initPCIConfig
 initControlLib
 initCapacityInfoXHCI
+initBulk
+initTimer
 
 ; =====================================================================================================
 

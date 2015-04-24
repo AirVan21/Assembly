@@ -22,12 +22,13 @@ PortValue:
 ; =====================================================================================================
 ; String CONSTS 
 
-usb_00    db 'UHCI (Universal Host Controller)$'
-usb_10    db 'OHCI (Open Host Controller)$'
-usb_20    db 'EHCI (Enhanced Host Controller)$'
-usb_30    db 'xHCI (Extensible Host Controller)$'
+usb_00    db 'UHCI (0x$'
+usb_10    db 'OHCI (0x$'
+usb_20    db 'EHCI (0x$'
+usb_30    db 'xHCI (0x$'
 usb_dummy db '  Host Controller is not supported', 13, 10, '$'
 sBusMsg	  db ', Bus = $'
+sBraket	  db ')', 13, 10, '$'
 
 ; =====================================================================================================
 
@@ -534,7 +535,19 @@ sBusMsg	  db ', Bus = $'
 		mov ah, 09h            ; Print string
 		int 21h                ;
 
-		call printNewLineRM
+		; Print PCI Address
+		lea edx, HCPCIAddressStorage
+		add edx, edi 
+		mov eax, [edx]
+		push ax 
+		shr eax, 16 
+		push ax 
+		call printWordFromStackRM
+		call printWordFromStackRM
+
+		mov ah, 09h
+		lea dx, sBraket
+		int 21h
 
 		;----------------------;
 		pop edx                ; Recover DX

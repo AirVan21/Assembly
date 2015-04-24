@@ -72,7 +72,11 @@ LinearWriteBufferAddress dd 0h
 ; Get 2-byte Device Status 
 ; 
 GetDeviceStatusReq 		db 80h, 0h
-						dw 0h, 0h, 2h 
+						dw 0h, 0h, 2h
+; Get 2-byte Device Status 
+; 
+GetEndpointStatusReq 	db 82h, 0h
+						dw 0h, 82h, 2h  
 
 ; Get 8-byte Device Descriptor 
 ;
@@ -147,7 +151,21 @@ SetPortFeatureReq		db 023h, 03h
 ; Clear Port Feature 
 ; 
 ClearPortFeatureReq		db 023h, 01h 
-						dw 0h, 0h, 0h ; wValue = Feature Selector | wIndex = Port Number  
+						dw 0h, 0h, 0h ; wValue = Feature Selector | wIndex = Port Number
+
+; Set Port Feature 
+; 
+MassStorageResetReq		db 00100001b, 0FFh 
+						dw 0h, 00h, 0h 	; wIndex is Interface Number 
+; Set Port Feature 
+; 
+GetMaxLunReq			db 10100001b, 0FEh 
+						dw 0h, 00h, 1h 	; wIndex is Interface Number 
+
+; Clear Endpoint Halt 
+; 
+ClearEndpointHaltReq	db 02h, 01h 
+						dw 0h, 02h, 0h ; wValue = Feature Selector 
 
 ; ===================================================================================================== 
 ; Port Feature
@@ -167,7 +185,15 @@ SetupQTDToken			dd 00080280h
 
 ; Token for IN Transaction
 ;
-InQTDToken				dd 80120180h 
+InQTDToken				dd 80120180h
+
+; Bulk IN Transaction
+;
+BulkInQTDToken			dd 80240180h
+
+; Bulk Out Transaction
+;
+BulkOutQTDToken			dd 001F0C80h   
 
 ; Token for OUT Transaction
 ;
@@ -225,12 +251,17 @@ WriteBuffer db 4096 DUP(0)
 	; ESI - contains pointer to perfrrmed transaction
 	performAQSetupTransaction proc
 		
+		push ax 
+
 		call createQueueHead
 		call createSetupQTD
 		call runAQueueinCMD
-		call Wait05s
+		mov ax, 10h 
+		call Int15Delay
 		call stopAQueueinCMD
 		;call printQTDStatus 
+
+		pop ax
 
 		ret 
 	
@@ -251,15 +282,71 @@ WriteBuffer db 4096 DUP(0)
 		call createQueueHead
 		call createInQTD
 		call runAQueueinCMD
-		call Wait05s 
+		mov ax, 30h 
+		call Int15Delay
 		call stopAQueueinCMD
-		;call printQTDStatus 
+		call printQTDStatus 
 
 		pop ax 
 
 		ret 
 	
 	endp  
+
+	; Creates MAIN Bulk Structure for OUT Transaction 
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; Waits timer 
+	; Sets USBCMD (Asynch Queue) bit to ZERO 
+	; 
+	performAQBulkOutTransaction proc
+		
+		push ax 
+
+		mov [ValidEndpoint], 02h
+		mov [ValidDeviceAddress], 02h 
+		mov [QHEndpointParam], 5200E000h
+		call createQueueHead
+		call createBulkOutQTD
+		call runAQueueinCMD
+		call updateOperRegInfo
+		call printOperRegInfo
+		mov ax, 30h 
+		call Int15Delay
+		call stopAQueueinCMD
+		call printQTDStatus
+		
+		call printTDArrayDump
+		
+		pop ax
+
+		ret 
+	
+	endp
+	
+	; Creates MAIN Bulk Structure for IN Transaction 
+	; Sets USBCMD (Asynch Queue) bit to ONE 
+	; Waits timer 
+	; Sets USBCMD (Asynch Queue) bit to ZERO 
+	; 
+	performAQBulkInTransaction proc
+		
+		push ax 
+
+		mov [ValidEndpoint], 82h
+		mov [ValidDeviceAddress], 02h 
+		call createQueueHead
+		call createBulkInQTD
+		call runAQueueinCMD
+		mov ax, 30h 
+		call Int15Delay
+		call stopAQueueinCMD
+		call printQTDStatus
+
+		pop ax
+
+		ret 
+	
+	endp
 
 	; Creates Setup qTD with Payload (described in ESI)
 	;
@@ -389,6 +476,145 @@ WriteBuffer db 4096 DUP(0)
 		
 		db 0C3h                			; ret 
 
+	; Creates Bulk IN  
+	;
+	; InQTDToken - Address of Token for IN Transaction
+	createBulkInQTD proc near
+
+		push eax                        ; Saves eax
+		push ebx                        ; 
+		push edx                        ; Will be used as a mem pointer
+		;-------------------------------;
+
+		xor ebx, ebx 
+		
+		; Next qTD pointer (0x00)
+		mov eax, dword ptr[QTDAddress1]  ; Address of first qTD 		
+		mov ebx, 01h                     ;
+		mov [eax], ebx                   ; Puts pointer in qTD 
+
+		; (0x04)
+		add eax, 04h 					 ;
+		mov ebx, 01h 					 ; Invalid Alternative Pointer
+		mov [eax], ebx 					 ; ZERO field 
+		
+		; (0x08)
+		add eax, 04h 					 ;
+		mov ebx, dword ptr [BulkInQTDToken] ; [31] = 1 In Packet; [14:12] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
+		mov [eax], ebx					 ; [30:16] = bytes to transfer 
+		
+		; (0x0C)
+		add eax, 04h 					 ;
+		mov ebx, dword ptr [LinearWriteBufferAddress]
+		mov [eax], ebx 					 ; Address of Buffer to Write
+
+		xor ebx, ebx 					 ; Zero Extra Buffer Pointers
+		
+		; (0x10)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x14)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x18)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x1C)
+		add eax, 4
+		mov [eax], ebx 
+		
+		;------------------------------;
+		
+		pop edx
+		pop ebx
+		pop eax 
+		
+		db 0C3h                			; ret
+	
+	endp
+
+	; Creates Bulk OUT  
+	;
+	; InQTDToken - Address of Token for IN Transaction
+	createBulkOutQTD proc near
+
+		push eax                        ; Saves eax
+		push ebx                        ; 
+		push edx                        ; Will be used as a mem pointer
+		;-------------------------------;
+
+		xor ebx, ebx 
+		
+		; Next qTD pointer (0x00)
+		mov eax, dword ptr[QTDAddress1]  ; Address of first qTD 		
+		mov ebx, 01h                     ;
+		mov [eax], ebx                   ; Puts pointer in qTD 
+
+		; (0x04)
+		add eax, 04h 					 ;
+		mov ebx, 01h 					 ; Invalid Alternative Pointer
+		mov [eax], ebx 					 ; ZERO field 
+		
+		; (0x08)
+		add eax, 04h 					 ;
+		mov ebx, dword ptr [BulkOutQTDToken] ; [31] = 1 In Packet; [14:12] = 000b; [9:8] = 01b IN PID; [7:0] = 0x80 Ready Status 
+		mov [eax], ebx					 ; [30:16] = bytes to transfer 
+		
+		; (0x0C)
+		add eax, 04h 					 ;
+		mov ebx, dword ptr [LinearDataBufferAddress]
+		mov [eax], ebx 					 ; Address of Buffer to Read 
+
+		mov edx, dword ptr [Read10Request]
+		mov fs:[ebx], edx 
+		
+		mov edx, dword ptr [Read10Request + 4]
+		mov fs:[ebx + 4], edx 		  
+		
+		mov edx, dword ptr [Read10Request + 8]
+		mov fs:[ebx + 8], edx 
+		
+		mov edx, dword ptr [Read10Request + 12]
+		mov fs:[ebx + 12], edx 		
+		
+		mov edx, dword ptr [Read10Request + 16]
+		mov fs:[ebx + 16], edx 		
+		
+		mov edx, dword ptr [Read10Request + 20]
+		mov fs:[ebx + 20], edx 
+		
+		mov edx, dword ptr [Read10Request + 24]
+		mov fs:[ebx + 24], edx
+
+		mov edx, dword ptr [Read10Request + 28]
+		mov fs:[ebx + 28], edx 
+		
+		; Zero Extra Buffer Pointers
+		xor ebx, ebx 
+		
+		; (0x10)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x14)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x18)
+		add eax, 4
+		mov [eax], ebx 
+		; (0x1C)
+		add eax, 4
+		mov [eax], ebx 
+		
+		;------------------------------;
+		
+		pop edx
+		pop ebx
+		pop eax 
+		
+		db 0C3h                			; ret
+	
+	endp
+
 	; Constructing a Queue Head 
 	; 
 	createQueueHead proc near
@@ -416,7 +642,11 @@ WriteBuffer db 4096 DUP(0)
 		mov ebx, dword ptr [QHEndpointParam]		
 		xor edx, edx 					; 
 		mov dl, [ValidDeviceAddress]	;
-		add bl, dl 						; Add Device Address 
+		add bl, dl 						; Add Device Address
+		xor dx, dx                      ;
+		mov dl, [ValidEndpoint]         ;
+		shl dx, 8                       ; Endpoint number [8:11]
+		add bx, dx                      ; 
 		mov [eax], ebx    		        ; (0x400 - max packet size [26:16])
 
 		; Transaction information (0x08)
@@ -620,7 +850,7 @@ WriteBuffer db 4096 DUP(0)
 
    		call printNewLineRM
 
-   		mov cx, 04h                     ; 
+   		mov cx, 08h                     ; 
 
    		mov edx, 00016000h				;	
       
@@ -673,7 +903,7 @@ WriteBuffer db 4096 DUP(0)
 
    		call printNewLineRM
 
-   		mov cx, 04h                     ; 
+   		mov cx, 0Ah                     ; 
 
    		mov edx, 00017000h				; 		
       

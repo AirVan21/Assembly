@@ -5,6 +5,8 @@ initEHCI macro
 
 EECPvalue					dw 0h 	
 
+isVerbosePrint				db 0h 
+
 OperRegOff 					dw 20h
 HCPCIAddress 				dd 0h
 HCBaseAddress 				dd 0h 
@@ -23,7 +25,9 @@ AlignedFrameAddress dw 0h
 ; CONSTS 
 
 USBLEGSUPoffset 	 = 00h 
-USBLEGCTLSTSoffset   = 04h 
+USBLEGCTLSTSoffset   = 04h
+
+InputParameter		 = 082h  
 
 ; =====================================================================================================
 ; Debug Strings 
@@ -55,6 +59,7 @@ sHighSpeedHub		  db "High Speed Hub,$"
 sRootHubPort		  db "Root Hub Port : $"
 sHubPort		  	  db "Hub Port $"
 sHSDeviceAddr		  db " Addr = $"
+sDisconnectedPort	  db "Empty ", 13, 10, "$"
 
 ; =====================================================================================================
 
@@ -67,22 +72,29 @@ sHSDeviceAddr		  db " Addr = $"
 		
 		push ebx           		 	; Save 
 		push esi				 	;
+		push eax 					;
 		;---------------------------;	
 		
 		; Rests HC and Inits Registers
 		call performInitialWorkaround
-		call Wait05s
+		mov ax, 10h 
+		call Int15Delay
 		
 		; Resets powered ports 
 		call updatePORTstate
-		call Wait05s
+		mov ax, 10h 
+		call Int15Delay
+		
 		; Init Log Print Tree  
 		mov [TreeLevel], 1h 
 		; Runs Device Detour 
-		call updatePORTstateReset 
+		call updatePORTstateReset  
 		
-     	; 
-     	call returnEHCIOwnership
+		;call runBulkTransfer
+		
+		call disableInterruptRegister
+		call returnEHCIOwnership
+
      	; Handles User Input 
      	;call handleUserInput
 
@@ -125,6 +137,7 @@ sHSDeviceAddr		  db " Addr = $"
   	  
 
   		;------------------------;
+  		pop eax                  ;
   		pop esi 				 ;
 		pop ebx            		 ; Recover  
 
@@ -410,6 +423,35 @@ sHSDeviceAddr		  db " Addr = $"
 
 	endp
 
+	; Setup USB Interrupt Register
+	;
+	disableInterruptRegister proc near
+		
+		push ebx           		 ; Save 
+		push eax           		 ; 
+		push edx                 ;
+		;------------------------; 
+
+		xor edx, edx 			 ; 
+
+		mov ebx, HCBaseAddress	 ; Base Address in EBX 
+
+		mov dx, OperRegOff		 ; Offset for Operational Register
+		add ebx, edx			 ; 
+		add ebx, USBINToffset    ;
+
+		xor eax, eax             ; 
+		mov fs:[ebx], eax 		 ; 
+
+		;------------------------;
+		pop edx                  ; 
+		pop eax                  ; 
+		pop ebx            		 ; Recover  
+
+		ret 
+
+	endp
+
 	; Updates information about HC Ports from PORTSC Registers  
 	; 
 	updatePORTstate proc 
@@ -537,51 +579,6 @@ sHSDeviceAddr		  db " Addr = $"
 	
 	endp
 
-	; Timer (Should be rewritten)
-	;
-	proc Wait05s near
-    
-        push    ES
-        push    EAX
-        mov     AX, 00h
-        mov     ES,AX
-        mov     EAX,[ES:046Ch]
-        inc     EAX
-	
-	@@Wait: cmp EAX,[ES:046Ch]
-    
-        jae     @@Wait
-        pop     EAX
-        pop     ES
-        ret
-	
-	endp
-
-	; Осуществить задержку AX миллисекунд через int 15h
-	; Ничего не использует, самый простой, но не всегда надёжный способ
-	; Устанавливает флаг CF=CY=1, если функция занята
-	;
-	Int15Delay  proc
-        push cx 
-        push ax 
-        push dx 
-
-        mov cx,1000
-        mul cx             ; Умножаем AX на 1000
-        mov cx,dx
-        mov dx,ax          ; Переносим DX:AX в CX:DX
-        mov ah,86h
-        int 15h            ; Вызываем int 15h
-        
-        pop dx 
-        pop ax 
-        pop cx 
-
-        ret
-	
-	Int15Delay  endp
-
-
 	; MAIN procedure for Device Initialization, Enumeration, Configuration
 	; Processes USB Hubs 
 	;
@@ -622,8 +619,8 @@ sHSDeviceAddr		  db " Addr = $"
 	  OutProcessUSBDevice:
 		
 		; Get String Descriptor
-		call printFormatStepRM
-		call getStringDescTransaction
+		;call printFormatStepRM
+		;call getStringDescTransaction
 	
 	  OutProcessUSBHubDevice:
 
@@ -805,9 +802,10 @@ sHSDeviceAddr		  db " Addr = $"
 		; Setup Transaction
 		lea esi, GetConfigReq
 		call performAQSetupTransaction
-
 		; In Transaction
 		call performAQInTransaction
+		; Dump To For Checking 
+		call printOutBufferDump
 
 		;------------------------;
 		pop dx 					 ; 
@@ -848,6 +846,8 @@ sHSDeviceAddr		  db " Addr = $"
 		mov [esi + wLengthOffset], dx  
 		call performAQSetupTransaction
 		call performAQInTransaction
+
+		;call printOutBufferDump
 
 		;------------------------;
 		pop dx 					 ; 
@@ -1005,21 +1005,8 @@ sHSDeviceAddr		  db " Addr = $"
         inc dx 
         mov word ptr [GetPortStatusReq + 4], dx
 
-        ; Gets Port Status 
-        call getPortStatusTransaction
-        mov edx, dword ptr [LinearWriteBufferAddress]
-        mov eax, fs:[edx]
-       
-        ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
-        test eax, 00010000h
-        jz enableNextHubPort
-
-        ; Update Port number
-        mov dx, word ptr [GetPortStatusReq + 4]
-        mov word ptr [SetPortFeatureReq + 4], dx
-        mov word ptr [ClearPortFeatureReq + 4], dx  
-		;------------------------------------------;
-		; Prints 
+        ;------------------------------------------;
+		; Prints Port  
 		push dx 
 		call printFormatStepRM
 		mov ah, 09h
@@ -1027,6 +1014,21 @@ sHSDeviceAddr		  db " Addr = $"
 		int 21h
 		call printByteFromStackRM
 		call printSpaceRM
+        
+        ; Gets Port Status 
+        call getPortStatusTransaction
+        mov edx, dword ptr [LinearWriteBufferAddress]
+        mov eax, fs:[edx]
+       
+        ; C_PORT_CONNECTION bit = 16-bit ([0] bit in wPortChange word)
+        test eax, 00010000h
+        jz informAboutEmptyPort
+
+        ; Update Port number
+        mov dx, word ptr [GetPortStatusReq + 4]
+        mov word ptr [SetPortFeatureReq + 4], dx
+        mov word ptr [ClearPortFeatureReq + 4], dx  
+
         ;------------------------------------------;
 		; CLEAR_FEATURE (C_PORT_CONNECTION)
         
@@ -1062,6 +1064,15 @@ sHSDeviceAddr		  db " Addr = $"
 		call retrieveUSBDeviceTypeAndProcess
 
 		inc [ConncetedUSBDeviceAmount]
+		jmp enableNextHubPort
+		;------------------------------------------;
+
+	  informAboutEmptyPort:
+
+		; Info About Empty Port 
+		mov ah, 09h
+		lea dx, sDisconnectedPort 
+		int 21h 
 
 	  enableNextHubPort:
  
@@ -1303,6 +1314,61 @@ sHSDeviceAddr		  db " Addr = $"
 
 	endp
 
+	; Handle User Input 
+	;
+	; 
+	runBulkTransfer proc near
+
+		push cx 
+		push eax
+		push ebx
+		;------------------------;
+
+		mov [ValidDeviceAddress], 02h 
+		mov [ValidEndpoint], 00h 
+
+
+		; Reset Mass Storage Device 
+		lea esi, MassStorageResetReq
+		call performAQSetupTransaction
+		call performAQInTransaction
+
+		call setDeviceConfigTransaction
+
+		; CLEAR_FEATURE ENDPOINT_HALT 
+		lea esi, ClearEndpointHaltReq
+		; Set OUT (01h) Endpoint info 
+		mov word ptr [ClearEndpointHaltReq + wIndexOffset], 1h 
+		call performAQSetupTransaction
+		call performAQInTransaction
+		
+		; CLEAR_FEATURE ENDPOINT_HALT 
+		lea esi, ClearEndpointHaltReq
+		;Set IN (02h) Endpoint info 
+		mov word ptr [ClearEndpointHaltReq + wIndexOffset], 82h 
+		call performAQSetupTransaction
+		call performAQInTransaction
+
+		; Get MAX LUN Transaction
+		lea esi, GetMaxLunReq
+		call performAQSetupTransaction
+		call performAQInTransaction		
+
+		;------------------------;
+		
+		;call performAQBulkOutTransaction
+
+		
+		; Print Description	
+		;------------------------;
+		pop cx 
+		pop eax 
+		pop ebx 
+
+		ret 
+
+	endp
+
 	; Sets HC BIOS ownership bit to one 
 	; Waits until HC OS ownership bit is zero 
 	; 
@@ -1331,31 +1397,65 @@ sHSDeviceAddr		  db " Addr = $"
 		out dx, eax				 ; Sets data to PCI device
 		mov USBLEGSUPReg, eax 	 ;
 
-	  	;xor ebx, ebx 			 ; 
+		mov eax, HCPCIAddress    ; PCI Address
+		mov bx, EECPvalue        ; Offset from PARAMS Register
+		add eax, ebx 			 ; 
 
-	  	;mov eax, HCPCIAddress	 ; HC PCI Address
-	  	;mov bx, EECPvalue 		 ; Value of Legacy USB Displacement 
- 		;add ebx, eax             ; Storage for PCI Address
-
- 		; Waits Until BIOS Owned bit is Zero 
-
-	 ; waitOSOwnZero:
-	 
-	 	;mov eax, ebx 			 ; PCI Address 
-		  	
-	  	;mov dx, CONFIG_ADDR		 ; Sets out PORT address
-		;out dx, eax 			 ; Sends request
-		;mov dx, CONFIG_DATA		 ; Sets input PORT address
-		;in  eax, dx				 ; Gets data from PCI device	
-
-		;test eax, 01000000h 	 ;
-
-	  	;jnz waitOSOwnZero		 
+ 		add eax, USBLEGCTLSTSoffset 
+ 		mov dx, CONFIG_ADDR		 ; Sets out PORT address
+		out dx, eax 			 ; Sends request
+		
+		mov dx, CONFIG_DATA		 ; Sets input PORT address
+		mov eax, USBLEGCTLSTSReg ; 
+		out dx, eax				 ; Sets data to PCI device
+		mov USBLEGSUPReg, eax 	 ;
 
 		;------------------------;
 		pop edx                  ; 
 		pop eax                  ; 
 		pop ebx            		 ; Recover  
+
+		ret 
+	
+	endp
+
+	; Retrieves print parameters 
+	;
+	;
+	checkInputKey proc near 
+		
+		push bx           		 ; Save 
+		push ax           		 ; 
+		;------------------------;
+
+		mov bx, InputParameter
+		mov ax, ds:[bx]
+
+		cmp al, 'v'
+		jz markVerboseState
+
+		cmp al, 'V'
+		jz markVerboseState
+
+		shr ax, 8
+		
+		cmp al, 'v'
+		jz markVerboseState
+
+		cmp al, 'V'
+		jz markVerboseState
+
+		jmp checkInputKeyoOt
+
+	  markVerboseState:
+
+	  	mov [isVerbosePrint], 01h	
+
+	  checkInputKeyoOt:
+		
+		;------------------------;
+		pop ax                   ; 
+		pop bx            		 ; Recover  
 
 		ret 
 	
