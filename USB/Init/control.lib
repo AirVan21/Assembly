@@ -97,7 +97,7 @@ CDbMaxPower				db 0h
 ; Configuration Descriptor (CD) strings 
 
 CDbDescriptorTypeMsg		db "Descriptor (0x02)    = $"
-CDwTotalLengthMsg			db "wTotalLength 		 = $"
+CDwTotalLengthMsg			db "wTotalLength         = $"
 CDbNumInterfacesMsg			db "Number of Interfaces = $"
 CDbConfigValueMsg			db "Configuration Value  = $"
 CDiConfigurationMsg			db "iConfiguration       = $"
@@ -477,8 +477,8 @@ PrintBuffer db 64 DUP(0)
 		mov [eax], ebx 			; 
 		mov ebx, fs:[esi + 4]	;
 		mov [eax + 4], ebx 		; 
-		mov bx, fs:[esi + 8]	;
-		mov [eax + 8], bx 		;
+		mov bl, fs:[esi + 8]	;
+		mov [eax + 8], bl 		;
 
 		;-----------------------;
         pop eax                 ; 
@@ -518,7 +518,7 @@ PrintBuffer db 64 DUP(0)
 		mov bl, [IDbNumEndpoints]
 		cmp bl, 0h
 		jz retrieveConfigDescriptorFull
-		
+
 
 	  outRetrieveConfigDescriptorFull:
 		;-----------------------;
@@ -539,26 +539,55 @@ PrintBuffer db 64 DUP(0)
 		push eax                ;
 		;------------------------
 
+		; Format Output Style 
+		inc [TreeLevel]
+		
 		; bDescriptorType
+		call printFormatStepRM
 		mov ah, 09h				
 		lea dx, CDbDescriptorTypeMsg
 		int 21h 
 		xor bx, bx 
 		mov bl, [CDbDescriptorType]
 		push bx 
-		call printWordFromStackRM
-		call printSpaceRM
+		call printByteFromStackRM
+		call printNewLineRM
 
+		; CDwTotalLength
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, CDwTotalLengthMsg
+		int 21h 
+		xor bx, bx
+		mov bx, [CDwTotalLength]
+		push bx 
+		call printWordFromStackRM
+		call printNewLineRM
+
+		; CDbNumInterfaces
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, CDbNumInterfacesMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [CDbNumInterfaces]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+		
 		; CDbConfigValue
+		call printFormatStepRM
 		mov ah, 09h				
 		lea dx, CDbConfigValueMsg
 		int 21h 
 		xor bx, bx
 		mov bl, [CDbConfigValue]
 		push bx 
-		call printWordFromStackRM
+		call printByteFromStackRM
 		call printNewLineRM
-		
+
+		; Format Output Style 
+		dec [TreeLevel]
 		;-----------------------;
         pop eax                 ; 
         pop edx                 ;
