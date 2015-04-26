@@ -60,12 +60,12 @@ DDbNumConfigurations	db 0h
 ; =====================================================================================================
 ; Device Descriptor Strings
 
-DDbDescriptorTypeMsg		db "Descriptor (0x01)   = $"
-DDbcdUSBMsg					db "USB Specification   = $"
-DDbDeviceClassMsg			db "Device Class        = $"
-DDbDeviceSubclassMsg		db "Device Subclass     = $"
-DDbDeviceProtocolMsg		db "Device Protocol     = $"
-DDbMaxPacketSizeMsg			db "Max Packet Size     = $"
+DDbDescriptorTypeMsg		db "Descriptor (0x01)    = $"
+DDbcdUSBMsg					db "USB Specification    = $"
+DDbDeviceClassMsg			db "Device Class         = $"
+DDbDeviceSubclassMsg		db "Device Subclass      = $"
+DDbDeviceProtocolMsg		db "Device Protocol      = $"
+DDbMaxPacketSizeMsg			db "Max Packet Size      = $"
 
 ; =====================================================================================================
 ; Hub Descriptor (HD) fields
@@ -96,9 +96,46 @@ CDbMaxPower				db 0h
 ; =====================================================================================================
 ; Configuration Descriptor (CD) strings 
 
-CDbDescriptorTypeMsg		db "Descriptor (0x02)   = $"
-CDbConfigValueMsg			db "Configuration Value = $"
-CDiConfigurationMsg			db "iConfiguration      = $"
+CDbDescriptorTypeMsg		db "Descriptor (0x02)    = $"
+CDwTotalLengthMsg			db "wTotalLength 		 = $"
+CDbNumInterfacesMsg			db "Number of Interfaces = $"
+CDbConfigValueMsg			db "Configuration Value  = $"
+CDiConfigurationMsg			db "iConfiguration       = $"
+CDbAttributesMsg			db "bmAttributes         = $"
+CDbMaxPowerMsg				db "bMaxPower            = $"
+
+; =====================================================================================================
+; Infterface Descriptor (ID) fields
+
+IDbLength				db 0h
+IDbDescriptorType		db 0h
+IDInTerfaceNumber		db 0h
+IDbAlternativeSettings  db 0h
+IDbNumEndpoints 		db 0h
+IDbInterfaceClass 		db 0h 
+IDbInterfaceSubClass 	db 0h 
+IDbInterfaceProtocol	db 0h 
+IDiInterface			db 0h 
+
+; =====================================================================================================
+; In Endpoint Descriptor (ED) fields
+
+EDInbLength				db 0h
+EDInbDescriptorType		db 0h
+EDInEndpointAddress		db 0h
+EDInbmAttributes		    db 0h
+EDInMaxPacketSize 		dw 0h
+EDInbInterval 			db 0h 
+
+; =====================================================================================================
+; Out Endpoint Descriptor (ED) fields
+
+EDOutbLength			db 0h
+EDOutbDescriptorType	db 0h
+EDOutEndpointAddress	db 0h
+EDOutbmAttributes		db 0h
+EDOutMaxPacketSize 		dw 0h
+EDOutbInterval 			db 0h 
 
 ; =====================================================================================================
 ; Print Buffer 
@@ -133,7 +170,8 @@ PrintBuffer db 64 DUP(0)
 		; Announce Message type 
 		mov ebx, [QTDAddress1]	
 		mov eax, [ebx + qTDTokenOffset]
-		shr eax, 8 
+		shr eax, 8
+		and al, 3h				; Sets Only PID   
 
 		cmp al, qTDSetupTokenType
 		jz fillQTDSetupToken
@@ -425,7 +463,7 @@ PrintBuffer db 64 DUP(0)
 	; Fills fields of Configuration Descriptor in mem 
 	; 
 	; ESI - Linear Address of Buffer where Configuration Descriptor is stored
-	retrieveConfigDescriptor proc near 
+	retrieveConfigDescriptorSmall proc near 
 
 		push ebx           		; Save ebx
 		push edx                ; 
@@ -439,9 +477,50 @@ PrintBuffer db 64 DUP(0)
 		mov [eax], ebx 			; 
 		mov ebx, fs:[esi + 4]	;
 		mov [eax + 4], ebx 		; 
+		mov bx, fs:[esi + 8]	;
+		mov [eax + 8], bx 		;
+
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp
+
+	; Fills fields of Interface and Endpoint Descriptors  
+	; 
+	; ESI - Linear Address of Buffer where Descriptors are stored
+	retrieveConfigDescriptorFull proc near 
+
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		; Get Number of Device Interfaces 
+		mov bl, [CDbNumInterfaces]
+		cmp bl, 0h 
+		jz retrieveConfigDescriptorFull
+		
+		; Load Interface Descriptor
+		xor eax, eax 			;
+		lea eax, IDbLength
+		mov ebx, fs:[esi]		;
+		mov [eax], ebx 			; 
+		mov ebx, fs:[esi + 4]	;
+		mov [eax + 4], ebx 		; 
 		mov bl, fs:[esi + 8]	;
 		mov [eax + 8], bl 		;
+		
+		; Get Number Of Endpoints 
+		mov bl, [IDbNumEndpoints]
+		cmp bl, 0h
+		jz retrieveConfigDescriptorFull
+		
 
+	  outRetrieveConfigDescriptorFull:
 		;-----------------------;
         pop eax                 ; 
         pop edx                 ;

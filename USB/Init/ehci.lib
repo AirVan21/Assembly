@@ -18,8 +18,8 @@ TreeLevel					dw 0h
 NumberOfHCPorts				dw 0h  
 
 ; Paragraph style 
-FrameAddress 		dw 0h
-AlignedFrameAddress dw 0h  
+FrameAddress 				dw 0h
+AlignedFrameAddress 		dw 0h  
 
 ; =====================================================================================================
 ; CONSTS 
@@ -32,12 +32,12 @@ InputParameter		 = 082h
 ; =====================================================================================================
 ; Debug Strings 
 
-USBLEGSUPmsg 	 db "USBLEGSUP  Register = $"
-USBLEGCTLSmsg 	 db "USBLEGCTLS Register = $"
+USBLEGSUPmsg 	 	  db "USBLEGSUP  Register = $"
+USBLEGCTLSmsg 	 	  db "USBLEGCTLS Register = $"
 
-sTakeBIOSControl db "Take EHCI control from BIOS", 13, 10, "$"
-sHCResetDone 	 db "HC Reset Done", 13, 10, "$"
-sHCInitDone 	 db "HC Init Done", 13, 10, "$"
+sTakeBIOSControl 	  db "Take EHCI control from BIOS", 13, 10, "$"
+sHCResetDone 	 	  db "HC Reset Done", 13, 10, "$"
+sHCInitDone 		  db "HC Init Done", 13, 10, "$"
 
 sDeviceDescriptorMsg  db "Get Device Descriptor   ", 13, 10, "$"
 sDeviceEnumerationMsg db "Device Enumeration      ", 13, 10, "$"
@@ -79,21 +79,22 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		call performInitialWorkaround
 		mov ax, 10h 
 		call Int15Delay
-		
 		; Resets powered ports 
 		call updatePORTstate
 		mov ax, 10h 
 		call Int15Delay
-		
+
 		; Init Log Print Tree  
 		mov [TreeLevel], 1h 
+		
 		; Runs Device Detour 
 		call updatePORTstateReset  
-		
-		;call runBulkTransfer
-		
+		;call prepareBulkTransfer
+		;call getSCSIInquiryTransaction
 		call disableInterruptRegister
 		call returnEHCIOwnership
+
+		int 20h 
 
      	; Handles User Input 
      	;call handleUserInput
@@ -606,7 +607,7 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		;GET_DESCRIPTOR (hub)
 		call getHubDescTransaction
 		;GET_STATUS (hub)  
-		call getHubStatusTransaction
+		; call getHubStatusTransaction
 		; SET_FEATURE (PORT_POWER) for HUB 
 		call setPowerHubPortsTransaction
 		; For Print Style
@@ -830,24 +831,23 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		;lea dx, sConfigDescMsg	
 		;int 21h 
 		
-		; Setup Transaction
+		; Get Only Configuration Descriptor
 		lea esi, GetConfigDescReq
 		call performAQSetupTransaction
-		; In Transaction
 		call performAQInTransaction
-		; Prints Result 
+		; Process Result 
 		mov esi, [LinearWriteBufferAddress]
-		call retrieveConfigDescriptor
-		;call printConfigDescriptor
-		
-		; Setup Transaction
+		call retrieveConfigDescriptorSmall
+
+		; Get Full Configuration & Interface & Endpoint Descriptors 
 		lea esi, GetConfigDescReq64
 		mov dx, [CDwTotalLength]
 		mov [esi + wLengthOffset], dx  
 		call performAQSetupTransaction
 		call performAQInTransaction
-
-		;call printOutBufferDump
+		; Process Result 
+		mov esi, [LinearWriteBufferAddress]
+		call retrieveConfigDescriptorFull
 
 		;------------------------;
 		pop dx 					 ; 
@@ -902,11 +902,8 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		;------------------------; 
 
 		; Get Status 
-        ; Setup Transaction
 		lea esi, GetPortStatusReq
 		call performAQSetupTransaction	
-
-		; In Transaction
 		call performAQInTransaction
 		
 		;------------------------;
@@ -1108,7 +1105,7 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		push eax 				 ;
 		push edx 				 ; 
 		;------------------------; 
-
+		
 		; Gets Port Status 
         call getPortStatusTransaction
         mov edx, dword ptr [LinearWriteBufferAddress]
@@ -1296,32 +1293,10 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 	; Handle User Input 
 	;
 	; 
-	handleUserInput proc near
+	prepareBulkTransfer proc near
 
 		push cx 
-		push eax
-		push ebx
-		;------------------------;
-
-
-		
-		;------------------------;
-		pop cx 
-		pop eax 
-		pop ebx 
-
-		ret 
-
-	endp
-
-	; Handle User Input 
-	;
-	; 
-	runBulkTransfer proc near
-
-		push cx 
-		push eax
-		push ebx
+		push esi
 		;------------------------;
 
 		mov [ValidDeviceAddress], 02h 
@@ -1332,8 +1307,6 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		lea esi, MassStorageResetReq
 		call performAQSetupTransaction
 		call performAQInTransaction
-
-		call setDeviceConfigTransaction
 
 		; CLEAR_FEATURE ENDPOINT_HALT 
 		lea esi, ClearEndpointHaltReq
@@ -1353,17 +1326,31 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		lea esi, GetMaxLunReq
 		call performAQSetupTransaction
 		call performAQInTransaction		
+		
+		; Test LUN == 0 
 
 		;------------------------;
-		
+		; Reaq10 Bulk OUT (CBW)
+
+		;lea esi, Read10Request
+		;mov [ValidEndpoint], 01h
+		;mov [ValidDeviceAddress], 02h 
 		;call performAQBulkOutTransaction
 
+		;------------------------;
+		; Read10 Bulk IN (Result)
 		
+		;mov [ValidEndpoint], 2h
+		;mov [ValidDeviceAddress], 02h 
+		;mov [InBytes], 200h
+		;call performAQBulkInTransaction
+		
+		;call printOutBufferDump
+
 		; Print Description	
 		;------------------------;
+		pop esi 
 		pop cx 
-		pop eax 
-		pop ebx 
 
 		ret 
 
@@ -1459,6 +1446,60 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 
 		ret 
 	
+	endp
+
+	; Performs GET_DESCRIPTOR (String) transaction 
+	; Prints String Result
+	; 
+	getSCSIInquiryTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push dx 				 ;
+		push cx                  ;
+		;------------------------;
+
+		mov cx, 16
+		call emptyOutWriteBuffer
+
+		;------------------------;
+		; Inquiry Bulk OUT (CBW)
+
+		lea esi, InquiryBulkRequest
+		mov [ValidEndpoint], 01h
+		mov [ValidDeviceAddress], 02h 
+		call performAQBulkOutTransaction
+		
+		;------------------------;
+		; Inquiry Bulk IN (Result)
+		
+		mov [ValidEndpoint], 2h
+		mov [ValidDeviceAddress], 02h 
+		mov [InBytes], 24h
+		call performAQBulkInTransaction
+
+		; Print Result 
+		mov esi, [LinearWriteBufferAddress]
+		; Displacement for output 
+		add esi, 4 
+		call printStringDescriptor
+
+		;------------------------;		
+		; Get CSW 
+		
+		mov [ValidEndpoint], 2h
+		mov [ValidDeviceAddress], 02h 
+		mov [InBytes], 13
+		call performAQBulkInTransaction
+		
+		;------------------------;
+		pop cx                   ;
+		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; 
+
+		ret
+
 	endp
 
 endm

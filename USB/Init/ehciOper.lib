@@ -151,6 +151,7 @@ CONFIGReg			dd 0h
 		mov edx, fs:[ebx]               ; Gets USBCMD Register 
 		or edx, 20h   			        ; Clears Asynch Queue bit 
 		mov fs:[ebx], edx               ; Set updated value 
+										;
 		;-------------------------------;
 										; Recover Register 
 		pop ebx 						;
