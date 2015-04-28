@@ -96,10 +96,11 @@ CDbMaxPower				db 0h
 ; =====================================================================================================
 ; Configuration Descriptor (CD) strings 
 
-CDbDescriptorTypeMsg		db "Descriptor (0x02)    = $"
+sCDMsg						db "Configuration Descriptor:", 13, 10, "$"
+CDbDescriptorTypeMsg		db "bDescriptor (0x02)   = $"
 CDwTotalLengthMsg			db "wTotalLength         = $"
-CDbNumInterfacesMsg			db "Number of Interfaces = $"
-CDbConfigValueMsg			db "Configuration Value  = $"
+CDbNumInterfacesMsg			db "bNumInterfaces       = $"
+CDbConfigValueMsg			db "bConfigurationValue  = $"
 CDiConfigurationMsg			db "iConfiguration       = $"
 CDbAttributesMsg			db "bmAttributes         = $"
 CDbMaxPowerMsg				db "bMaxPower            = $"
@@ -109,7 +110,7 @@ CDbMaxPowerMsg				db "bMaxPower            = $"
 
 IDbLength				db 0h
 IDbDescriptorType		db 0h
-IDInTerfaceNumber		db 0h
+IDbInterfaceNumber		db 0h
 IDbAlternativeSettings  db 0h
 IDbNumEndpoints 		db 0h
 IDbInterfaceClass 		db 0h 
@@ -118,12 +119,25 @@ IDbInterfaceProtocol	db 0h
 IDiInterface			db 0h 
 
 ; =====================================================================================================
+; Configuration Descriptor (CD) strings 
+
+sIDMsg						db "Interface Descriptor:", 13, 10, "$"
+IDbDescriptorTypeMsg	    db "bDescriptor (0x04)   = $"
+IDbInterfaceNumberMsg		db "bInterfaceNumber	 = $"
+IDbAlternativeSettingsMsg   db "bAlternativeSettings = $"
+IDbNumEndpointsMsg 		    db "bNumEndpoints        = $"
+IDbInterfaceClassMsg 		db "bInterfaceClass      = $" 
+IDbInterfaceSubClassMsg 	db "bInterfaceSubClass   = $" 
+IDbInterfaceProtocolMsg	    db "bInterfaceProtocol   = $" 
+IDiInterfaceMsg			    db "iInterface           = $" 
+
+; =====================================================================================================
 ; In Endpoint Descriptor (ED) fields
 
 EDInbLength				db 0h
 EDInbDescriptorType		db 0h
 EDInEndpointAddress		db 0h
-EDInbmAttributes		    db 0h
+EDInbmAttributes		db 0h
 EDInMaxPacketSize 		dw 0h
 EDInbInterval 			db 0h 
 
@@ -283,7 +297,7 @@ PrintBuffer db 64 DUP(0)
         pop edx                 ;
         pop ebx                 ;
 
-		ret 
+		db 0C3h                 ; ret 
 
 	endp
 
@@ -413,6 +427,7 @@ PrintBuffer db 64 DUP(0)
 		mov [eax + 2], bl
 		mov bx, word ptr fs:[esi + 3]
 		mov [eax + 3], bx
+		
 		;-----------------------;
         pop eax                 ; 
         pop edx                 ;
@@ -497,6 +512,8 @@ PrintBuffer db 64 DUP(0)
 		push ebx           		; Save ebx
 		push edx                ; 
 		push eax                ;
+		push esi                ;
+		push cx                 ;
 		;------------------------
 		
 		; Get Number of Device Interfaces 
@@ -507,6 +524,9 @@ PrintBuffer db 64 DUP(0)
 		; Load Interface Descriptor
 		xor eax, eax 			;
 		lea eax, IDbLength
+		xor edx, edx 
+		mov dl, [CDbLength]     ; Add Configuration Descriptor Displacement
+		add esi, edx            ; 
 		mov ebx, fs:[esi]		;
 		mov [eax], ebx 			; 
 		mov ebx, fs:[esi + 4]	;
@@ -515,13 +535,43 @@ PrintBuffer db 64 DUP(0)
 		mov [eax + 8], bl 		;
 		
 		; Get Number Of Endpoints 
-		mov bl, [IDbNumEndpoints]
-		cmp bl, 0h
-		jz retrieveConfigDescriptorFull
+		xor edx, edx 
+		mov dl, [IDbLength]		; Add Interface Descriptor Displacement
+		add esi, edx            ; 
+		
+		xor cx, cx 
+		mov cl, [IDbNumEndpoints]
+  
+      fillEndpointInfoInStorage:	  
+	 	
+		xor dx, dx              ; 
+		mov dl, fs:[esi + 2]    ; Endpoint Address
+		test dl, 80h            ; Check in Endpoint                    
+		jnz chooseInEndpoint    ; 
+		
+		lea eax, EDOutbLength   ; 
+       	
+       	jmp fillEndpointInfo
+       
+       chooseInEndpoint:
+	    
+	    lea eax, EDInbLength    ;
+	   
+	   fillEndpointInfo:
+		
+		mov ebx, fs:[esi]		;
+		mov [eax], ebx 			; 
+		mov bx, fs:[esi + 4]	;
+		mov [eax + 4], bx 		; 
+		mov bl, fs:[esi + 6]    ;
+		mov [eax + 6], bl       ; 
+		add esi, 07h            ; Endpoint Descriptor Length 
 
-
-	  outRetrieveConfigDescriptorFull:
+		loop fillEndpointInfoInStorage  
+		
 		;-----------------------;
+        pop cx                  ;
+        pop esi                 ;
         pop eax                 ; 
         pop edx                 ;
         pop ebx                 ;
@@ -538,10 +588,15 @@ PrintBuffer db 64 DUP(0)
 		push edx                ; 
 		push eax                ;
 		;------------------------
-
+		
 		; Format Output Style 
 		inc [TreeLevel]
 		
+		call printFormatStepRM
+		mov ah, 09h
+		lea dx, sCDMsg
+		int 21h 
+
 		; bDescriptorType
 		call printFormatStepRM
 		mov ah, 09h				
@@ -586,8 +641,159 @@ PrintBuffer db 64 DUP(0)
 		call printByteFromStackRM
 		call printNewLineRM
 
+		; CDiConfiguration
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, CDiConfigurationMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [CDiConfiguration]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; CDbAttributes
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, CDbAttributesMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [CDbAttributes]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; CDbMaxPower
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, CDbMaxPowerMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [CDbMaxPower]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
 		; Format Output Style 
 		dec [TreeLevel]
+		;-----------------------;
+        pop eax                 ; 
+        pop edx                 ;
+        pop ebx                 ;
+
+		ret 
+
+	endp 
+
+	; Prints Configuration Descriptor fields 
+	;
+	printInterfaceDescriptor proc near
+		
+		push ebx           		; Save ebx
+		push edx                ; 
+		push eax                ;
+		;------------------------
+		
+		; Format Output Style 
+		inc [TreeLevel]
+		
+		; Interface Descriptor
+		call printFormatStepRM
+		mov ah, 09h
+		lea dx, sIDMsg
+		int 21h 
+		
+		; IDbDescriptorType
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbDescriptorTypeMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbDescriptorType]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbInterfaceNumber
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbInterfaceNumberMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbInterfaceNumber]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbAlternativeSettings
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbAlternativeSettingsMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbAlternativeSettings]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbNumEndpoints
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbNumEndpointsMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbNumEndpoints]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbInterfaceClass
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbInterfaceClassMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbInterfaceClass]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbInterfaceSubClass
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbInterfaceSubClassMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbInterfaceSubClass]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDbInterfaceProtocol
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDbInterfaceProtocolMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDbInterfaceProtocol]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+
+		; IDiInterface
+		call printFormatStepRM
+		mov ah, 09h				
+		lea dx, IDiInterfaceMsg
+		int 21h 
+		xor bx, bx
+		mov bl, [IDiInterface]
+		push bx 
+		call printByteFromStackRM
+		call printNewLineRM
+		
+		; Format Output Style 
+		dec [TreeLevel]
+		
 		;-----------------------;
         pop eax                 ; 
         pop edx                 ;

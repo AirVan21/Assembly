@@ -24,10 +24,11 @@ AlignedFrameAddress 		dw 0h
 ; =====================================================================================================
 ; CONSTS 
 
-USBLEGSUPoffset 	 = 00h 
-USBLEGCTLSTSoffset   = 04h
+USBLEGSUPoffset 	 	= 00h 
+USBLEGCTLSTSoffset   	= 04h
+ZeroEndpoint 			= 00h 
 
-InputParameter		 = 082h  
+InputParameter		 	= 082h  
 
 ; =====================================================================================================
 ; Debug Strings 
@@ -89,8 +90,12 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		
 		; Runs Device Detour 
 		call updatePORTstateReset  
-		;call prepareBulkTransfer
-		;call getSCSIInquiryTransaction
+		
+		call prepareBulkTransfer
+		call getSCSIInquiryTransaction
+		call getSCSICapacityTransaction
+		call getSCSIRead10Transaction
+		
 		call disableInterruptRegister
 		call returnEHCIOwnership
 
@@ -608,6 +613,9 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		call getHubDescTransaction
 		;GET_STATUS (hub)  
 		; call getHubStatusTransaction
+		; Print Hub Info 
+		call printConfigDescriptor	
+		call printInterfaceDescriptor
 		; SET_FEATURE (PORT_POWER) for HUB 
 		call setPowerHubPortsTransaction
 		; For Print Style
@@ -845,6 +853,7 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		mov [esi + wLengthOffset], dx  
 		call performAQSetupTransaction
 		call performAQInTransaction
+		
 		; Process Result 
 		mov esi, [LinearWriteBufferAddress]
 		call retrieveConfigDescriptorFull
@@ -1266,9 +1275,9 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 	; CX - contains amount of 4-bytes 
 	emptyOutWriteBuffer proc near
 
-		push cx 
-		push eax
 		push ebx
+		push eax
+		push cx 
 		;------------------------;
 
 		mov ebx, [LinearWriteBufferAddress]
@@ -1295,38 +1304,42 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 	; 
 	prepareBulkTransfer proc near
 
-		push cx 
+		push bx 
 		push esi
 		;------------------------;
 
 		mov [ValidDeviceAddress], 02h 
-		mov [ValidEndpoint], 00h 
+		mov [ValidEndpoint], ZeroEndpoint 
 
 
 		; Reset Mass Storage Device 
 		lea esi, MassStorageResetReq
 		call performAQSetupTransaction
 		call performAQInTransaction
-
+		
+		xor bx, bx 
+		mov bl, [EDInEndpointAddress] 
 		; CLEAR_FEATURE ENDPOINT_HALT 
 		lea esi, ClearEndpointHaltReq
 		; Set OUT (01h) Endpoint info 
-		mov word ptr [ClearEndpointHaltReq + wIndexOffset], 1h 
+		mov word ptr [ClearEndpointHaltReq + wIndexOffset], bx 
 		call performAQSetupTransaction
 		call performAQInTransaction
 		
+		xor bx, bx 
+		mov bl, [EDOutEndpointAddress] 
 		; CLEAR_FEATURE ENDPOINT_HALT 
 		lea esi, ClearEndpointHaltReq
 		;Set IN (02h) Endpoint info 
-		mov word ptr [ClearEndpointHaltReq + wIndexOffset], 82h 
+		mov word ptr [ClearEndpointHaltReq + wIndexOffset], bx
 		call performAQSetupTransaction
 		call performAQInTransaction
 
 		; Get MAX LUN Transaction
 		lea esi, GetMaxLunReq
 		call performAQSetupTransaction
-		call performAQInTransaction		
-		
+		call performAQInTransaction	
+
 		; Test LUN == 0 
 
 		;------------------------;
@@ -1350,7 +1363,7 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		; Print Description	
 		;------------------------;
 		pop esi 
-		pop cx 
+		pop bx 
 
 		ret 
 
@@ -1448,8 +1461,8 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 	
 	endp
 
-	; Performs GET_DESCRIPTOR (String) transaction 
-	; Prints String Result
+	; Performs SCSI Inquiry transaction 
+	; Prints Result
 	; 
 	getSCSIInquiryTransaction proc near
 
@@ -1466,14 +1479,12 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		; Inquiry Bulk OUT (CBW)
 
 		lea esi, InquiryBulkRequest
-		mov [ValidEndpoint], 01h
 		mov [ValidDeviceAddress], 02h 
 		call performAQBulkOutTransaction
 		
 		;------------------------;
 		; Inquiry Bulk IN (Result)
 		
-		mov [ValidEndpoint], 2h
 		mov [ValidDeviceAddress], 02h 
 		mov [InBytes], 24h
 		call performAQBulkInTransaction
@@ -1486,8 +1497,6 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 
 		;------------------------;		
 		; Get CSW 
-		
-		mov [ValidEndpoint], 2h
 		mov [ValidDeviceAddress], 02h 
 		mov [InBytes], 13
 		call performAQBulkInTransaction
@@ -1495,6 +1504,114 @@ sDisconnectedPort	  db "Empty ", 13, 10, "$"
 		;------------------------;
 		pop cx                   ;
 		pop dx 					 ; 
+		pop eax 				 ; 
+		pop esi            		 ; 
+
+		ret
+
+	endp
+
+	; Performs SCSI Capacity transaction 
+	; Prints String Result
+	; 
+	getSCSICapacityTransaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push edx 				 ;
+		push cx                  ;
+		;------------------------;
+
+		mov cx, 16
+		call emptyOutWriteBuffer
+		
+		;------------------------;
+		; Inquiry Bulk OUT (CBW)
+
+		lea esi, ReadCapacityRequest
+		mov [ValidDeviceAddress], 02h 
+		call performAQBulkOutTransaction
+		
+		;------------------------;
+		; Inquiry Bulk IN (Result)
+		
+		mov [ValidDeviceAddress], 02h 
+		mov [InBytes], 8h
+		call performAQBulkInTransaction
+
+		; Save Capacity Parameters 
+		mov eax, [LinearWriteBufferAddress]
+		mov ebx, fs:[eax]
+		bswap ebx 
+		mov [MSLogicalBlockAddress], ebx 
+		
+		mov eax, [LinearWriteBufferAddress + 4]
+		mov ebx, fs:[eax]
+		bswap ebx 
+		mov [MSBlockLength], ebx 
+
+		;------------------------;		
+		; Get CSW 
+		
+		mov [ValidDeviceAddress], 02h 
+		mov [InBytes], 13
+		call performAQBulkInTransaction
+
+		;------------------------;
+		pop cx                   ;
+		pop edx 				 ; 
+		pop eax 				 ; 
+		pop esi            		 ; 
+
+		ret
+
+	endp
+
+	; Performs SCSI Read10 transaction 
+	; 
+	getSCSIRead10Transaction proc near
+
+		push esi 				 ;
+		push eax 				 ;
+		push edx 				 ;
+		push cx                  ;
+		;------------------------;
+		
+		;------------------------;
+		; Inquiry Bulk OUT (CBW)
+
+		lea esi, Read10Request
+		mov eax, 800h
+		mov dword ptr [Read10Request + 8], eax
+		mov edx, 1000h  
+		bswap edx 
+		mov dword ptr [Read10Request + 17], edx
+		mov cx, 4
+		mov byte ptr [Read10Request + 22], ch
+		mov byte ptr [Read10Request + 23], cl
+		mov [ValidDeviceAddress], 02h 
+		
+		call performAQBulkOutTransaction
+		
+		;------------------------;
+		; Inquiry Bulk IN (Result)
+		
+		mov [ValidDeviceAddress], 02h 
+		mov [InBytes], 80Dh
+		call performAQBulkInTransaction
+
+		call printTDArrayDump
+
+		;------------------------;		
+		; Get CSW 
+		
+		;mov [ValidDeviceAddress], 02h 
+		;mov [InBytes], 13
+		;call performAQBulkInTransaction
+		
+		;------------------------;
+		pop cx                   ;
+		pop edx 				 ; 
 		pop eax 				 ; 
 		pop esi            		 ; 
 
